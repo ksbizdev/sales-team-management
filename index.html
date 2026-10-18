@@ -678,6 +678,25 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
  .moto-hero{width:100%;height:auto!important;aspect-ratio:892 / 796!important;}
 }
 
+
+/* v49 - stable auth bootstrap and editable branch photo zoom */
+.branch-zoom-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 17px;padding:11px 12px;border:1px solid #e3e8f3;border-radius:13px;background:#f8faff}
+.branch-zoom-toolbar label{font-weight:700;font-size:13px;color:#4c5c7d;min-width:78px}
+.branch-zoom-toolbar input[type=range]{flex:1;min-width:110px;max-width:none;padding:0;accent-color:#7770e9}
+.branch-zoom-toolbar b{min-width:48px;text-align:right;font-size:13px;color:#45557c}
+.branch-zoom-toolbar .btn{min-width:35px;padding:7px 10px}
+.dark .branch-zoom-toolbar{background:#172543;border-color:#344664}
+.dark .branch-zoom-toolbar label,.dark .branch-zoom-toolbar b{color:#e4eaff}
+.branch-cover img{transition:none!important;animation:none!important}
+.restoring-panel{min-height:46vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:13px;border:1px solid #e9edf5;border-radius:18px;background:#fff;color:#65738d}
+.restoring-panel p{font-size:14px;margin:0}
+.restoring-spinner{width:32px;height:32px;border-radius:50%;border:3px solid #e8eaff;border-top-color:#7568f0;animation:spinRestoring .8s linear infinite}
+@keyframes spinRestoring{to{transform:rotate(360deg)}}
+.restoring-tabs{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.restoring-tabs span{padding:10px 12px;border-radius:11px;color:#7a88a0;background:#f2f4f9;font-size:13px}
+.restoring-tabs span.active{background:#edf0ff;color:#5962bb;font-weight:750}
+.dark .restoring-panel{background:#172543;border-color:#344664;color:#d9e2f6}
+@media(max-width:580px){.branch-zoom-toolbar{gap:7px}.branch-zoom-toolbar label{width:100%}.branch-zoom-toolbar input[type=range]{min-width:80px}}
 </style></head><body><div id="root"></div><script>
 const initial=[];
 let filterKeyword="",filterExcluded=new Set();let columnFilters={name:null,ic:null,branch:null,role:null,status:null},sortColumn='',sortDirection=1,filterPopup=null,memberModalError='',transferSearch='';let people=initial.map(x=>({...x})),branches=[],history=[],notices=[],page='Dashboard',role='Admin',actor=0,theme='Light',view='List',statusFilter='Active',search='',branchFilter='All',roleFilter='All',managerFilter='All',showInactive=false,selected=null,modal='',adminTab='User Management',pageNo=1,perPage=10,exportOpen=false;
@@ -707,7 +726,7 @@ function dashboard(){
  const cards=[['Total Active',list.length,'◈'],['Sales Manager',count('Manager'),'♛'],['Sales Team Leader',count('Leader'),'♜'],['Sales Advisor',count('Member'),'✦']];
  return `<div class="stats">${cards.map(s=>`<div class="card stat"><div class="stat-heading"><small>${s[0]}</small><span class="stat-icon" aria-hidden="true">${s[2]}</span></div><b>${s[1]}</b><small>Active members</small></div>`).join('')}</div><div class="branch-gallery">${branchData.map(b=>{
  const branchActive=list.filter(p=>memberInBranch(p,b.name)),ms=branchActive.filter(p=>p.role==='Manager'),leaderCount=branchActive.filter(p=>p.role==='Leader').length,advisorCount=branchActive.filter(p=>p.role==='Member').length,totalBranch=ms.length+leaderCount+advisorCount;
- return `<div class="card branch-card" role="button" tabindex="0" title="Open ${esc(b.name)} Team Management" aria-label="Open ${esc(b.name)} Team Management" onclick="openDashboardBranch(decodeURIComponent('${encodeURIComponent(b.name)}'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"><div class="branch-cover">${b.photo?`<img src="${esc(b.photo)}" style="object-position:${Number(b.photoX??50)}% ${Number(b.photoY??50)}%" alt="${esc(b.name)} branch">`:'<span class="fallback">⌂</span>'}</div><div class="branch-info"><div class="branch-head"><strong>${esc(b.name)}</strong><span class="branch-total" title="Total active managers, leaders and sales advisors">${totalBranch} ${totalBranch===1?'person':'people'}</span></div><div class="branch-role-counts"><div><b>${ms.length}</b><small>Manager${ms.length===1?'':'s'}</small></div><div><b>${leaderCount}</b><small>Leader${leaderCount===1?'':'s'}</small></div><div><b>${advisorCount}</b><small>Sales Advisor${advisorCount===1?'':'s'}</small></div></div><div class="branch-managers"><b>Branch Manager${ms.length===1?'':'s'}</b><div style="margin-top:7px">${ms.map(m=>esc(m.name)).join(', ')||'Not assigned'}</div></div></div></div>`
+ return `<div class="card branch-card" role="button" tabindex="0" title="Open ${esc(b.name)} Team Management" aria-label="Open ${esc(b.name)} Team Management" onclick="openDashboardBranch(decodeURIComponent('${encodeURIComponent(b.name)}'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"><div class="branch-cover">${b.photo?`<img src="${esc(b.photo)}" style="object-position:${Number(b.photoX??50)}% ${Number(b.photoY??50)}%;transform-origin:${Number(b.photoX??50)}% ${Number(b.photoY??50)}%;transform:scale(${zoomBounds(b.photoZoom??1)})" alt="${esc(b.name)} branch">`:'<span class="fallback">⌂</span>'}</div><div class="branch-info"><div class="branch-head"><strong>${esc(b.name)}</strong><span class="branch-total" title="Total active managers, leaders and sales advisors">${totalBranch} ${totalBranch===1?'person':'people'}</span></div><div class="branch-role-counts"><div><b>${ms.length}</b><small>Manager${ms.length===1?'':'s'}</small></div><div><b>${leaderCount}</b><small>Leader${leaderCount===1?'':'s'}</small></div><div><b>${advisorCount}</b><small>Sales Advisor${advisorCount===1?'':'s'}</small></div></div><div class="branch-managers"><b>Branch Manager${ms.length===1?'':'s'}</b><div style="margin-top:7px">${ms.map(m=>esc(m.name)).join(', ')||'Not assigned'}</div></div></div></div>`
  }).join('')}</div>`;
 }
 
@@ -878,7 +897,7 @@ function commitGridSearch(close=true){if(!dataPopup)return;let {kind,key,values}
 document.addEventListener('pointerdown',e=>{if(dataPopup&&!e.target.closest('#grid-filter-popup,.data-filter-icon')){dataPopup=null;document.getElementById('grid-filter-popup')?.remove()}});
 function gridBody(kind){let rows=gridFiltered(kind);if(kind==='activity')return rows.map(r=>`<tr><td>${esc(r.time)}</td><td>${esc(r.actor)}</td><td>${esc(r.action)}</td><td>${esc(r.detail)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No activity</td></tr>';
 if(kind==='users')return rows.map(r=>`<tr class="admin-row" onclick="openUserEditor(${r._id})"><td><strong>${esc(r.name)}</strong></td><td>${esc(r.username)}</td><td>${esc(r.role)}</td><td>${esc(r.branch)}</td><td><span class="pill ${r.status!=='Enabled'?'off':''}">${esc(r.status)}</span></td><td><button class="btn ghost sm" onclick="event.stopPropagation();openUserEditor(${r._id})">Edit</button> <button class="btn ghost sm" ${r.username==='Not created'?'disabled':''} onclick="event.stopPropagation();openPasswordReset(${r._id})">Reset Password</button></td></tr>`).join('')||'<tr><td colspan="6">No users</td></tr>';
-if(kind==='branches')return rows.map(r=>`<tr class="admin-row" onclick="openBranchEditor(${r._id})"><td>${branchData[r._id]?.photo?`<img class="branch-thumb" src="${esc(branchData[r._id].photo)}" style="object-position:${Number(branchData[r._id].photoX??50)}% ${Number(branchData[r._id].photoY??50)}%" alt="${esc(r.name)} photo">`:'<div class="branch-thumb-empty">No photo</div>'}</td><td><strong>${esc(r.name)}</strong></td><td><span class="pill ${r.status==='Inactive'?'off':''}">${r.status}</span></td><td><button class="btn ghost sm" onclick="event.stopPropagation();openBranchEditor(${r._id})">Edit</button> <button class="btn ghost sm" onclick="event.stopPropagation();toggleBranchDirect(${r._id})">Set ${r.status==='Active'?'Inactive':'Active'}</button></td></tr>`).join('')||'<tr><td colspan="4">No branches</td></tr>';
+if(kind==='branches')return rows.map(r=>`<tr class="admin-row" onclick="openBranchEditor(${r._id})"><td>${branchData[r._id]?.photo?`<img class="branch-thumb" src="${esc(branchData[r._id].photo)}" style="object-position:${Number(branchData[r._id].photoX??50)}% ${Number(branchData[r._id].photoY??50)}%;transform-origin:${Number(branchData[r._id].photoX??50)}% ${Number(branchData[r._id].photoY??50)}%;transform:scale(${zoomBounds(branchData[r._id].photoZoom??1)})" alt="${esc(r.name)} photo">`:'<div class="branch-thumb-empty">No photo</div>'}</td><td><strong>${esc(r.name)}</strong></td><td><span class="pill ${r.status==='Inactive'?'off':''}">${r.status}</span></td><td><button class="btn ghost sm" onclick="event.stopPropagation();openBranchEditor(${r._id})">Edit</button> <button class="btn ghost sm" onclick="event.stopPropagation();toggleBranchDirect(${r._id})">Set ${r.status==='Active'?'Inactive':'Active'}</button></td></tr>`).join('')||'<tr><td colspan="4">No branches</td></tr>';
 return ''}
 function gridTable(kind){return `<div class="tablewrap"><table><thead><tr>${gridColumns[kind].map(([k,l])=>gridHead(kind,k,l)).join('')}${kind==='users'||kind==='branches'?'<th>Action</th>':''}</tr></thead><tbody id="${kind}-grid-body">${gridBody(kind)}</tbody></table></div>`}
 
@@ -985,39 +1004,43 @@ function openPasswordReset(id){selected=id;modal='resetpass';render()}
 function passwordResetForm(){let p=byId(selected);return `<p>Reset password for <b>${esc(p?.name||'')}</b></p><label>New Password</label><input id="resetPasswordValue" type="password" placeholder="Minimum 6 characters"><div class="actions" style="margin-top:18px"><button class="btn" onclick="savePasswordReset()">Save Password</button><button class="btn ghost" onclick="openUserEditor(${selected})">← Back</button></div>`}
 function savePasswordReset(){let p=byId(selected),pw=$('resetPasswordValue')?.value||'';if(pw.length<6)return showModalError('Password must contain at least 6 characters.');p.password=pw;log('Reset Password',p.name+' password reset');closeModal()}
 function resetPassword(id){openPasswordReset(id)}
-function openBranchEditor(i){uploadedBranchPhoto=null;selected=i;const b=branchData[i];branchPosition={x:Number(b?.photoX??50),y:Number(b?.photoY??50)};modal='branchEdit';render()}
+function openBranchEditor(i){uploadedBranchPhoto=null;selected=i;const b=branchData[i];branchPosition={x:Number(b?.photoX??50),y:Number(b?.photoY??50)};branchPhotoZoom=Number(b?.photoZoom??1);modal='branchEdit';render()}
 function branchEditor(){const b=selected===null?null:branchData[selected];
  const image=uploadedBranchPhoto||b?.photo||null;
  return `<div class="formgrid"><div><label>Branch Name</label><input id="editBranchName" value="${esc(b?.name||'')}" placeholder="Branch name"></div><div><label>Status</label><select id="editBranchStatus">${option(['Active','Inactive'],b?.status||'Active')}</select></div></div>
  <label>Branch Photo (Dashboard)</label>
- <p class="muted">Upload a photo, then drag it up/down or left/right to choose the part shown on Dashboard.</p>
+ <p class="muted">Upload a photo, drag to reposition, or zoom in / out. Preview matches the Dashboard crop.</p>
  <input id="branchImageFile" type="file" accept="image/*" onchange="branchFileSelected(event)">
  <div id="branchPhotoPreview">${branchPhotoStage(image)}</div>
  <div class="actions" style="margin-top:18px"><button class="btn" onclick="saveBranchEditor()">Save Branch</button><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`
 }
+let branchPhotoZoom=1;
+const zoomBounds=v=>Math.max(1,Math.min(3,Math.round(Number(v)*10)/10));
+function branchPhotoStyle(){return `object-position:${branchPosition.x}% ${branchPosition.y}%;transform-origin:${branchPosition.x}% ${branchPosition.y}%;transform:scale(${branchPhotoZoom});`}
 function branchPhotoStage(src){if(!src)return '<p class="muted">No photo uploaded yet.</p>';
- return `<div id="branchPhotoFrame" class="branch-preview-frame" onpointerdown="branchDragStart(event)" onpointermove="branchDragMove(event)" onpointerup="branchDragEnd(event)" onpointercancel="branchDragEnd(event)"><img id="branchPhotoImage" draggable="false" src="${esc(src)}" style="object-position:${branchPosition.x}% ${branchPosition.y}%" alt="Dashboard branch photo preview"><span class="position-badge">✥ Drag to reposition photo</span></div><div class="branch-photo-position-toolbar"><span class="muted">Dashboard photo crop · ${branchPosition.x}% / ${branchPosition.y}%</span><button type="button" class="btn ghost sm" onclick="resetBranchPosition()">Reset to center</button></div>`
+ return `<div id="branchPhotoFrame" class="branch-preview-frame" onpointerdown="branchDragStart(event)" onpointermove="branchDragMove(event)" onpointerup="branchDragEnd(event)" onpointercancel="branchDragEnd(event)"><img id="branchPhotoImage" draggable="false" src="${esc(src)}" style="${branchPhotoStyle()}" alt="Dashboard branch photo preview"><span class="position-badge">✥ Drag to reposition photo</span></div><div class="branch-photo-position-toolbar"><span id="branchCropText" class="muted">Dashboard crop · X ${branchPosition.x}% / Y ${branchPosition.y}%</span><button type="button" class="btn ghost sm" onclick="resetBranchPosition()">Reset</button></div><div class="branch-zoom-toolbar"><label for="branchZoomRange">Photo zoom</label><button type="button" class="btn ghost sm" onclick="changeBranchZoom(branchPhotoZoom-.1)" aria-label="Zoom out">−</button><input id="branchZoomRange" type="range" min="1" max="3" step="0.1" value="${branchPhotoZoom}" oninput="changeBranchZoom(this.value)" aria-label="Branch photo zoom"><button type="button" class="btn ghost sm" onclick="changeBranchZoom(branchPhotoZoom+.1)" aria-label="Zoom in">+</button><b id="branchZoomText">${Math.round(branchPhotoZoom*100)}%</b></div>`
 }
+function updateBranchPhotoPreview(){const img=$('branchPhotoImage');if(img)img.style.cssText=branchPhotoStyle();const txt=$('branchCropText');if(txt)txt.textContent='Dashboard crop · X '+branchPosition.x+'% / Y '+branchPosition.y+'%';const t=$('branchZoomText');if(t)t.textContent=Math.round(branchPhotoZoom*100)+'%';const slider=$('branchZoomRange');if(slider)slider.value=branchPhotoZoom;}
+function changeBranchZoom(value){branchPhotoZoom=zoomBounds(value);updateBranchPhotoPreview()}
 let branchPosition={x:50,y:50},branchDrag=null;
 function branchDragStart(e){if(e.button!==0&&e.pointerType==='mouse')return;const box=e.currentTarget;branchDrag={startX:e.clientX,startY:e.clientY,x:branchPosition.x,y:branchPosition.y};box.classList.add('dragging');box.setPointerCapture?.(e.pointerId);e.preventDefault()}
 function branchDragMove(e){if(!branchDrag)return;const box=e.currentTarget,r=box.getBoundingClientRect(),img=$('branchPhotoImage');
  const w=img?.naturalWidth||1,h=img?.naturalHeight||1,coverScale=Math.max(r.width/w,r.height/h);
- const extraX=Math.max(w*coverScale-r.width,0),extraY=Math.max(h*coverScale-r.height,0);
+ const extraX=Math.max(w*coverScale*branchPhotoZoom-r.width,0),extraY=Math.max(h*coverScale*branchPhotoZoom-r.height,0);
  const clamp=v=>Math.max(0,Math.min(100,Math.round(v)));
  branchPosition.x=extraX>0?clamp(branchDrag.x-(e.clientX-branchDrag.startX)/extraX*100):50;
  branchPosition.y=extraY>0?clamp(branchDrag.y-(e.clientY-branchDrag.startY)/extraY*100):50;
- if(img)img.style.objectPosition=branchPosition.x+'% '+branchPosition.y+'%';
- const t=box.nextElementSibling?.querySelector('span');if(t)t.textContent='Dashboard photo crop · '+branchPosition.x+'% / '+branchPosition.y+'%';
+ updateBranchPhotoPreview();
 }
 function branchDragEnd(e){if(!branchDrag)return;branchDrag=null;e.currentTarget.classList.remove('dragging');try{e.currentTarget.releasePointerCapture(e.pointerId)}catch(err){}}
-function resetBranchPosition(){branchPosition={x:50,y:50};const el=$('branchPhotoPreview');if(el)el.innerHTML=branchPhotoStage(uploadedBranchPhoto||branchData[selected]?.photo||null)}
+function resetBranchPosition(){branchPosition={x:50,y:50};branchPhotoZoom=1;updateBranchPhotoPreview()}
 let uploadedBranchPhoto=null;
 let branchPhotoLoading=false;
 function branchFileSelected(e){
  const file=e.target.files?.[0];if(!file)return;
  if(!file.type.startsWith('image/'))return showModalError('Please choose an image file.');
  if(file.size>12*1024*1024)return showModalError('Image must be smaller than 12 MB.');
- branchPhotoLoading=true;uploadedBranchPhoto=null;branchPosition={x:50,y:50};
+ branchPhotoLoading=true;uploadedBranchPhoto=null;branchPosition={x:50,y:50};branchPhotoZoom=1;
  const preview=$('branchPhotoPreview');if(preview)preview.innerHTML='<p class="muted">Processing photo...</p>';
  const reader=new FileReader();
  reader.onerror=()=>{branchPhotoLoading=false;showModalError('Unable to read image. Please try another photo.')};
@@ -1038,7 +1061,7 @@ function branchFileSelected(e){
  };
  reader.readAsDataURL(file);
 }
-function saveBranchEditor(){if(branchPhotoLoading)return showModalError('Please wait for the photo to finish processing.');const name=$('editBranchName')?.value.trim(),status=$('editBranchStatus')?.value;let b=selected===null?null:branchData[selected];if(!name)return showModalError('Branch Name is required.');if(branchData.some((x,i)=>i!==selected&&x.name.toLowerCase()===name.toLowerCase()))return showModalError('Duplicate Branch Name.');if(b){let old=b.name;b.name=name;b.status=status;if(uploadedBranchPhoto)b.photo=uploadedBranchPhoto;b.photoX=branchPosition.x;b.photoY=branchPosition.y;people.forEach(p=>{if(p.branch===old)p.branch=name;if(Array.isArray(p.branches))p.branches=p.branches.map(x=>x===old?name:x)});log('Edit Branch',old+' → '+name+' ('+status+')')}else{branchData.push({name,status,photo:uploadedBranchPhoto||null,photoX:branchPosition.x,photoY:branchPosition.y});log('Add Branch',name)}uploadedBranchPhoto=null;branches=branchData.map(b=>b.name);closeModal();if(!persist())console.warn('Changes are visible in this session but this preview prevented permanent local storage.')}
+function saveBranchEditor(){if(branchPhotoLoading)return showModalError('Please wait for the photo to finish processing.');const name=$('editBranchName')?.value.trim(),status=$('editBranchStatus')?.value;let b=selected===null?null:branchData[selected];if(!name)return showModalError('Branch Name is required.');if(branchData.some((x,i)=>i!==selected&&x.name.toLowerCase()===name.toLowerCase()))return showModalError('Duplicate Branch Name.');if(b){let old=b.name;b.name=name;b.status=status;if(uploadedBranchPhoto)b.photo=uploadedBranchPhoto;b.photoX=branchPosition.x;b.photoY=branchPosition.y;b.photoZoom=branchPhotoZoom;people.forEach(p=>{if(p.branch===old)p.branch=name;if(Array.isArray(p.branches))p.branches=p.branches.map(x=>x===old?name:x)});log('Edit Branch',old+' → '+name+' ('+status+')')}else{branchData.push({name,status,photo:uploadedBranchPhoto||null,photoX:branchPosition.x,photoY:branchPosition.y,photoZoom:branchPhotoZoom});log('Add Branch',name)}uploadedBranchPhoto=null;branches=branchData.map(b=>b.name);closeModal();if(!persist())console.warn('Changes are visible in this session but this preview prevented permanent local storage.')}
 function toggleBranchDirect(i){let b=branchData[i];if(!b)return;b.status=b.status==='Active'?'Inactive':'Active';log('Branch Status',b.name+' → '+b.status);render()}
 const previousModal=modalHTML;
 modalHTML=function(){if(!['branchEdit','resetpass','useredit'].includes(modal))return previousModal();let title={branchEdit:selected===null?'Add Branch':'Edit Branch',resetpass:'Reset Password',useredit:'Edit Login Account'}[modal];return `<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal ${modal==='useredit'?'wide-modal':''}"><div class="toolbar" style="justify-content:space-between"><h2>${title}</h2><button class="btn ghost sm" onclick="closeModal()">✕</button></div>${modal==='branchEdit'?branchEditor():modal==='resetpass'?passwordResetForm():userEditForm()}</div></div>`};
@@ -1287,8 +1310,7 @@ const saveRoleSetupV31=saveRoleSetup;
 saveRoleSetup=function(){if(modal==='rolePermissionEdit'){if(role!=='Admin')return roleMessage('Access denied.');roleTemplates[roleSetupSelected]=readPermissions();storeRoleTemplates();log('Role Setup',roleSetupSelected+' default permissions updated');modal='';roleSetupScreen='listing';render();return}return saveRoleSetupV31()};
 // v32: Create User Branch chooser remains multi-select, with the same closed-field look as Role.
 
-try { render(); }
-catch (err) { document.getElementById('root').innerHTML = '<div style="font:16px Arial;padding:35px;color:#ae1734;background:#fff">System startup error: '+String(err&&err.message||err).replace(/</g,'&lt;')+'</div>'; }
+// v49: rendering is deferred until session bootstrap below to avoid login flash.
 
 
 // v47: Supabase-backed shared workspace (administrator scope only).
@@ -1302,7 +1324,7 @@ function rememberSalesView(){try{localStorage.setItem(SALES_VIEW_KEY,JSON.string
 function clearSalesView(){try{localStorage.removeItem(SALES_VIEW_KEY)}catch(e){}}
 function restoreSalesView(){try{const p=JSON.parse(localStorage.getItem(SALES_VIEW_KEY)||'null');if(!p)return;const allowed=['Dashboard','Team Management','Ultranet','Activity History','Administration'];if(allowed.includes(p.page)&&hasModule(p.page))page=p.page;if(['User Management','Role Setup','Branch Setup','Login History'].includes(p.adminTab))adminTab=p.adminTab;if(['Light','Starlight'].includes(p.theme))theme=p.theme;if(['List','Hierarchy'].includes(p.view))view=p.view;if(typeof p.branchFilter==='string'&&(p.branchFilter==='All'||branches.includes(p.branchFilter)))branchFilter=p.branchFilter;if(['Active','Inactive','All'].includes(p.statusFilter))statusFilter=p.statusFilter;if(['All','Manager','Leader','Member'].includes(p.roleFilter))roleFilter=p.roleFilter;}catch(e){console.warn('Could not restore view:',e)}}
 async function renewSalesSession(){if(salesRefreshPromise)return salesRefreshPromise;if(!salesAuthRefreshToken)throw new Error('Session expired. Please sign in again.');salesRefreshPromise=(async()=>{const renewed=await salesAuthCall('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:salesAuthRefreshToken})});if(!renewed.access_token)throw new Error('Session renewal failed.');salesAuthAccessToken=renewed.access_token;salesAuthRefreshToken=renewed.refresh_token||salesAuthRefreshToken;salesAuthExpiresAt=Date.now()+Math.max(30,Number(renewed.expires_in||3600))*1000;saveSalesSession();return renewed;})();try{return await salesRefreshPromise}finally{salesRefreshPromise=null}}
-async function restoreSalesSession(){let stored;try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){return}if(!stored?.refresh_token)return;salesAuthRefreshToken=stored.refresh_token;salesAuthAccessToken=stored.access_token||null;salesAuthExpiresAt=Number(stored.expires_at||0);try{if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();const response=await cloudRequest('/rest/v1/user_profiles?select=id,username,enabled&username=eq.admin');if(!Array.isArray(response)||response.length!==1||response[0].enabled!==true)throw Error('Administrator access disabled');await loadCloudWorkspace();sessionUser='admin';role='Admin';actor=0;restoreSalesView();startCloudPolling();render();}catch(e){console.warn('Unable to restore authenticated session:',e);if(/fetch|network|connection/i.test(String(e.message||e))){const err=document.getElementById('loginError');if(err)err.textContent='Connection unavailable. Please retry when online.';}else{salesAuthAccessToken=null;salesAuthRefreshToken=null;clearSalesSession();} }}
+async function restoreSalesSession(){let stored;try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){return}if(!stored?.refresh_token)return;salesAuthRefreshToken=stored.refresh_token;salesAuthAccessToken=stored.access_token||null;salesAuthExpiresAt=Number(stored.expires_at||0);try{if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();const response=await cloudRequest('/rest/v1/user_profiles?select=id,username,enabled&username=eq.admin');if(!Array.isArray(response)||response.length!==1||response[0].enabled!==true)throw Error('Administrator access disabled');await loadCloudWorkspace();sessionUser='admin';role='Admin';actor=0;restoreSalesView();startCloudPolling();render();}catch(e){console.warn('Unable to restore authenticated session:',e);if(/fetch|network|connection/i.test(String(e.message||e))){showRestoringShell('Connection unavailable. Your page is preserved.','Retry connection');}else{salesAuthAccessToken=null;salesAuthRefreshToken=null;clearSalesSession();render();} }}
 let cloudVersion=0, cloudReady=false, cloudDirty=false, cloudSaving=false, cloudSaveTimer=null, cloudStatusMessage='';
 let cloudActivityTimer=null;
 const salesCloudNotice=document.createElement('style');
@@ -1362,6 +1384,16 @@ const cloudOriginalRender=render;
 render=function(){if(sessionUser)rememberSalesView();cloudOriginalRender();if(sessionUser){const main=document.querySelector('main.main');if(main){const top=main.querySelector('.top');if(top)top.insertAdjacentHTML('afterend',cloudBanner());}}};
 window.addEventListener('beforeunload',e=>{if(sessionUser)rememberSalesView();if(cloudDirty||cloudSaving){e.preventDefault();e.returnValue='Unsaved changes';}});
 // After reload, verify the existing Supabase session before revealing user content.
-restoreSalesSession();
+function showRestoringShell(message='Restoring your session…', action=''){
+ let saved={};try{saved=JSON.parse(localStorage.getItem(SALES_VIEW_KEY)||'{}')||{}}catch(e){}
+ const current=['Dashboard','Team Management','Ultranet','Activity History','Administration'].includes(saved.page)?saved.page:'Dashboard';
+ const currentTab=['User Management','Role Setup','Branch Setup','Login History'].includes(saved.adminTab)?saved.adminTab:'User Management';
+ document.body.className=saved.theme==='Starlight'?'dark':'';
+ const nav=['Dashboard','Team Management','Ultranet','Activity History','Administration'];
+ $('root').innerHTML=`<div class="app restoring-app"><aside class="side"><div class="brand">✦ Sales Team<br>Management</div>${nav.map(n=>`<div class="nav ${n===current?'active':''}">${({'Dashboard':'◫','Team Management':'♧','Ultranet':'▤','Activity History':'◷','Administration':'⚙'})[n]} &nbsp; ${n}</div>`).join('')}</aside><main class="main"><header class="top"><h1>${esc(current)}</h1></header>${current==='Administration'?`<div class="restoring-tabs">${['User Management','Role Setup','Branch Setup','Login History'].map(t=>`<span class="${currentTab===t?'active':''}">${t}</span>`).join('')}</div>`:''}<div class="restoring-panel"><div class="restoring-spinner" aria-hidden="true"></div><p>${esc(message)}</p>${action?'<button class="btn secondary sm" onclick="retrySalesSession()">'+esc(action)+'</button>':''}</div></main></div>`;
+}
+async function retrySalesSession(){showRestoringShell();await restoreSalesSession()}
+function initializeSalesUI(){let saved=null;try{saved=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}if(saved?.refresh_token){showRestoringShell();restoreSalesSession();}else{render();}}
+initializeSalesUI();
 
 </script></body></html>
