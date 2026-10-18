@@ -1347,12 +1347,12 @@ function ultranetData(){
 
 function ultranet(){
  const branchesForTabs=['All',...branches],rows=ultranetData();
- const cols=[['branch','Branch'],['name','Full Name'],['role','Role'],['status','Status'],['userId','User ID'],...(canViewUltranetPassword()?[['password','Password']]:[])];
+ const cols=[['branch','Branch'],['name','Full Name'],['role','Role'],['status','Status'],['userId','User ID'],];
  return `<div class="card"><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select></div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
 }
 function ultranetRowsHTML(rows){
  let previousGroup='';
- const count=canViewUltranetPassword()?6:5;
+ const count=5;
  return rows.map(x=>{
   const m=x.member,group=memberGroup(m),key=group.managerId+':'+group.leaderId;
   const isGroupStart=key!==previousGroup;previousGroup=key;
@@ -1360,7 +1360,7 @@ function ultranetRowsHTML(rows){
   const separator=isGroupStart?`<tr class="team-group-divider ${group.leaderId?'team-group-leader':'team-group-manager'}"><td colspan="${count}"><span class="group-label">${groupLabel}</span></td></tr>`:'';
   const rc=m.role==='Manager'?'ultra-manager-row':m.role==='Leader'?'ultra-leader-row':'';
   const canOpen=ulAllowed('Edit')||ulAllowed('Add');
-  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td>${esc(x.record?.userId||'—')}</td>${canViewUltranetPassword()?`<td>${x.record?.password?`<span class="ultra-password">${esc(x.record.password)}</span>`:'—'}</td>`:''}</tr>`;
+  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td>${esc(x.record?.userId||'—')}</td></tr>`;
  }).join('')||`<tr><td colspan="${count}" class="empty">No matching members</td></tr>`;
 }
 
@@ -1373,7 +1373,10 @@ document.addEventListener('pointerdown',e=>{if(!e.target.closest('#ultranet-filt
 function openUltranetDelete(id){if(!ulAllowed('Delete'))return;selected=id;modal='ultranetDelete';render()}
 function confirmUltranetDelete(){if(!ulAllowed('Delete'))return;let p=byId(selected);ultranetRecords=ultranetRecords.filter(x=>x.memberId!==selected);log('Ultranet Delete',p?.name||'');closeModal()}
 function openUltranetEdit(id){if(!(ulAllowed('Edit')||ulAllowed('Add')))return;selected=id;modal='ultranetEdit';render()}
-function ultranetEditForm(){let p=byId(selected),r=ultranetRecords.find(x=>x.memberId===selected);return `<div class="formgrid"><div><label>Full Name (linked from Team Management)</label><div class="field">${esc(p?.name||'')}</div></div><div><label>User ID</label><input id="ultraID" value="${esc(r?.userId||'')}"></div>${canViewUltranetPassword()?`<div><label>Password</label><input id="ultraPW" value="${esc(r?.password||'')}" autocomplete="off"></div>`:''}</div><div class="actions"><button class="btn" onclick="saveUltranetRecord()">Save</button>${r&&ulAllowed('Delete')?`<button class="btn danger" onclick="deleteUltranetRecord()">Delete Ultranet Entry</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`}
+function ultranetEditForm(){
+ const p=byId(selected),r=ultranetRecords.find(x=>x.memberId===selected);
+ return `<div class="formgrid"><div><label>Full Name (linked from Team Management)</label><div class="field">${esc(p?.name||'')}</div></div><div><label for="ultraID">User ID</label><input id="ultraID" value="${esc(r?.userId||'')}" autocomplete="off"></div><div style="grid-column:1/-1"><label>Password</label><div class="field" style="color:var(--muted,#718096)">Managed through secure authentication. Password changes are not available in Ultranet yet.</div></div></div><div class="actions"><button class="btn" onclick="saveUltranetRecord()">Save</button>${r&&ulAllowed('Delete')?`<button class="btn danger" onclick="deleteUltranetRecord()">Delete Ultranet Entry</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
+}
 function deleteUltranetRecord(){if(!ulAllowed('Delete'))return showModalError('Delete permission required.');let p=byId(selected);ultranetRecords=ultranetRecords.filter(x=>x.memberId!==selected);log('Ultranet Delete',p?.name||'');closeModal()}
 function saveUltranetRecord(){let id=$('ultraID')?.value?.trim(),pw=canViewUltranetPassword()?$('ultraPW')?.value:null;if(!id)return showModalError('User ID is required.');if(ultranetRecords.some(x=>x.userId.toLowerCase()===id.toLowerCase()&&x.memberId!==selected))return showModalError('User ID already exists.');let r=ultranetRecords.find(x=>x.memberId===selected);if(!r){r={memberId:selected,userId:id,password:''};ultranetRecords.push(r)}r.userId=id;if(canViewUltranetPassword())r.password=pw;log('Ultranet',byId(selected).name+' Ultranet details saved');closeModal()}
 const priorModalV17=modalHTML;
@@ -1581,7 +1584,7 @@ salesCloudNotice.textContent='.cloud-banner{display:flex;align-items:center;gap:
 document.head.appendChild(salesCloudNotice);
 function cloudClean(x){if(Array.isArray(x))return x.map(cloudClean);if(!x||typeof x!=='object')return x;const o={};for(const [k,v] of Object.entries(x)){if(/password|secret|token|credential|authkey/i.test(k))continue; if(typeof v!=='function')o[k]=cloudClean(v);}return o;}
 function cloudPayload(){return cloudClean({people,branchData,history,notices,loginEvents,ultranetRecords,roleTemplates,roleSetupNames});}
-function cloudApply(p){p=p||{};people=Array.isArray(p.people)?p.people:[];branchData=Array.isArray(p.branchData)?p.branchData:[];branches=branchData.map(b=>b.name);history=Array.isArray(p.history)?p.history:[];notices=Array.isArray(p.notices)?p.notices:[];loginEvents=Array.isArray(p.loginEvents)?p.loginEvents:[];ultranetRecords=Array.isArray(p.ultranetRecords)?p.ultranetRecords:[];roleTemplates=p.roleTemplates&&typeof p.roleTemplates==='object'?p.roleTemplates:{};roleSetupNames=Array.isArray(p.roleSetupNames)?p.roleSetupNames:['Manager','Leader','Member'];for(const n of roleSetupNames)if(!roleTemplates[n])roleTemplates[n]=defaultPerms(n);}
+function cloudApply(p){p=p||{};people=Array.isArray(p.people)?p.people:[];branchData=Array.isArray(p.branchData)?p.branchData:[];branches=branchData.map(b=>b.name);history=Array.isArray(p.history)?p.history:[];notices=Array.isArray(p.notices)?p.notices:[];loginEvents=Array.isArray(p.loginEvents)?p.loginEvents:[];ultranetRecords=Array.isArray(p.ultranetRecords)?p.ultranetRecords.map(x=>({memberId:x.memberId,userId:x.userId||''})):[];roleTemplates=p.roleTemplates&&typeof p.roleTemplates==='object'?p.roleTemplates:{};roleSetupNames=Array.isArray(p.roleSetupNames)?p.roleSetupNames:['Manager','Leader','Member'];for(const n of roleSetupNames)if(!roleTemplates[n])roleTemplates[n]=defaultPerms(n);}
 async function cloudRequest(path,options={}){
  if(!salesAuthAccessToken)throw new Error('Your session is not authenticated. Sign in again.');
  if(salesAuthRefreshToken && Date.now()>salesAuthExpiresAt-60000)await renewSalesSession();
@@ -1626,7 +1629,19 @@ createAccount=function(){alert('User creation requires secure server-side Supaba
 saveUserEditor=function(){showModalError('Account editing and password changes require secure server-side Supabase Auth provisioning. Disabled in this release.');};
 savePasswordReset=function(){showModalError('Passwords must be reset via Supabase Auth, not stored in this application.');};
 resetPassword=function(){alert('Password changes are managed in Supabase Authentication.');};
-saveUltranetRecord=function(){showModalError('Ultranet password editing is disabled until a secure credential service is configured.');};
+// v60: Allow linked Ultranet User ID updates. Authentication secrets are never saved in shared workspace.
+saveUltranetRecord=function(){
+ if(!ulAllowed('Edit')&&!ulAllowed('Add'))return showModalError('Ultranet edit permission required.');
+ const member=byId(selected);
+ if(!member)return showModalError('Linked member was not found.');
+ const id=String(document.getElementById('ultraID')?.value||'').trim();
+ if(!id)return showModalError('User ID is required.');
+ if(ultranetRecords.some(x=>x.memberId!==selected&&String(x.userId||'').trim().toLowerCase()===id.toLowerCase()))return showModalError('User ID already exists.');
+ let r=ultranetRecords.find(x=>x.memberId===selected);
+ if(!r){r={memberId:selected,userId:id};ultranetRecords.push(r)}else{r.userId=id;delete r.password;}
+ log('Ultranet',member.name+' Ultranet User ID saved');
+ closeModal();
+};
 function cloudBanner(){if(!sessionUser||!cloudDirty||!cloudStatusMessage||cloudStatusMessage==='Saving to Supabase…')return '';return '<div class="cloud-banner cloud-error"><span>⚠</span><span>'+esc(cloudStatusMessage)+'</span><button onclick="cloudReload()">Reload data</button></div>';}
 async function cloudReload(){if(cloudDirty){alert('Unsaved changes are pending. Please wait for save or resolve the error first.');return;}try{await loadCloudWorkspace();render()}catch(e){alert('Unable to reload Supabase data: '+e.message)}}
 const cloudOriginalRender=render;
