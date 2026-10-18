@@ -858,6 +858,25 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 .user-admin-search{margin:0 0 14px;max-width:390px}.user-admin-search input{width:100%;max-width:none}
 
 .ultra-secret-cell{display:flex;align-items:center;gap:8px;white-space:nowrap}.ultra-secret-cell>span{max-width:200px;overflow:hidden;text-overflow:ellipsis}.ultra-secret-entry{display:flex;gap:8px;align-items:center}.ultra-secret-entry input{flex:1;min-width:0}.ultra-secret-form{grid-column:1/-1}
+
+/* v64: native hierarchy horizontal scrolling only; no duplicate slider */
+.hier-team .hier-horizontal-bar{display:none!important}
+
+/* v65 categorized account directory and activity log */
+.user-category-tabs{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+.user-category-tabs button{border:1px solid #dce4f4;padding:10px 18px;border-radius:11px;background:transparent;color:inherit;font-weight:750;cursor:pointer}
+.user-category-tabs button.active{background:#eef0ff;border-color:#adbbf8;color:#5c63c8}
+.user-role-pill{display:inline-block;font-size:12px;font-weight:750;border-radius:999px;padding:5px 10px}
+.user-role-pill.manager{background:#e9efff;color:#3a69c1}.user-role-pill.leader{background:#dcf4f0;color:#087d76}.user-role-pill.member{background:#fff0db;color:#ac681d}.user-role-pill.superadmin{background:#f1e8ff;color:#8750be}
+.user-directory-search{margin-bottom:12px;width:min(380px,100%)}
+.user-category-modal-row{display:flex;gap:8px;margin:0 0 20px}
+.user-category-modal-row button{flex:1;min-width:0}
+.user-linked-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:16px 0}
+.user-linked-details>div{background:var(--field,#f8faff);border:1px solid #e2e7f4;border-radius:12px;padding:12px;overflow-wrap:anywhere}
+.user-linked-details label{display:block;font-size:11px;color:#7a859f;margin-bottom:5px}
+.user-linked-details b{font-size:14px}
+.user-category-note{color:#8490a7;font-size:12px;line-height:1.6;margin-top:12px}
+@media(max-width:540px){.user-linked-details{grid-template-columns:1fr}.user-category-tabs button{flex:1}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -892,11 +911,11 @@ window.addEventListener('scroll',queueHierarchyRails,{passive:true});
 function scrollBranchTabs(button,direction){const track=button.closest('.branch-tabs-shell')?.querySelector('.branch-tabs');if(track)track.scrollBy({left:direction*Math.max(200,track.clientWidth*.72),behavior:'smooth'});}
 function showActiveBranchTab(){document.querySelectorAll('.branch-tabs').forEach(track=>{const selected=track.querySelector('.branch-tab.active');if(!selected)return;const start=selected.offsetLeft-track.offsetLeft,end=start+selected.offsetWidth;if(start<track.scrollLeft)track.scrollLeft=start;else if(end>track.scrollLeft+track.clientWidth)track.scrollLeft=end-track.clientWidth;});}
 
-window.addEventListener('resize',()=>{setupHierarchyRails();});
+
 const initial=[];
 let filterKeyword="",filterExcluded=new Set();let columnFilters={name:null,ic:null,branch:null,role:null,status:null},sortColumn='',sortDirection=1,filterPopup=null,memberModalError='',transferSearch='';let people=initial.map(x=>({...x})),branches=[],history=[],notices=[],page='Dashboard',role='Admin',actor=0,theme='Light',view='List',statusFilter='Active',search='',branchFilter='All',roleFilter='All',managerFilter='All',showInactive=false,selected=null,modal='',adminTab='User Management',pageNo=1,perPage=99999,exportOpen=false;
 const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const byId=id=>people.find(p=>p.id===+id);const children=id=>people.filter(p=>p.parent===id);function rootManager(p){let seen=new Set();while(p&&p.parent!=null&&!seen.has(p.id)){seen.add(p.id);p=byId(p.parent)}return p?.role==='Manager'?p:null}function desc(id){let out=[];function walk(x){for(let c of children(x)){out.push(c);walk(c.id)}}walk(id);return out}function isManaged(p){if(role==='Admin')return true;if(role==='Member')return false;let me=byId(actor);return !!me&&(p.id===me.id||desc(me.id).some(x=>x.id===p.id))}function canEdit(p){return canAction('Team Management','Edit')&&p.status==='Active'&&(role==='Admin'||(role==='Manager'||role==='Leader')&&isManaged(p))}function visible(){if(role==='Admin')return people;let me=byId(actor);if(!me)return [];if(role==='Member')return people.filter(p=>rootManager(p)?.id===rootManager(me)?.id);return [me,...desc(me.id)]}function ic(p){return role==='Admin'||(role!=='Member'&&isManaged(p))?p.ic:'******-**-'+p.ic.slice(-4)}function log(action,detail){let t=new Date().toLocaleString();history.unshift({time:t,actor:currentUserName(),action,detail});notices.unshift({time:t,action,detail,read:false});persist()}function notify(msg){alert(msg)}function managers(){return people.filter(p=>p.role==='Manager'&&p.status==='Active')}function option(arr,val){return arr.map(v=>`<option value="${esc(v)}" ${String(v)===String(val)?'selected':''}>${esc(v)}</option>`).join('')}function setPage(p){if(!hasModule(p))return notify('Access denied.');page=p;selected=null;modal='';rememberSalesView();render()}function setTheme(t){theme=t;rememberSalesView();render()}
-function render(){document.body.className=theme==='Starlight'?'dark':'';if(!sessionUser){$('root').innerHTML=loginScreen();return;}let nav=['Dashboard','Team Management',...(hasModule('Ultranet')?['Ultranet']:[]),...(hasModule('Activity History')?['Activity History']:[]),...(hasModule('Administration')?['Administration']:[])];$('root').innerHTML=`<div class="app"><aside class="side"><div class="brand">✦ Sales Team<br>Management</div>${nav.map((n,i)=>`<button class="nav ${page===n?'active':''}" data-nav="${n}" onclick="setPage('${n}')">${({'Dashboard':'◫','Team Management':'♧','Activity History':'◷','Administration':'⚙','Ultranet':'▤'})[n]} &nbsp; ${n}</button>`).join('')}</aside><main class="main"><header class="top"><div><h1>${esc(page)}</h1></div><div class="toolbar"><span class="muted">${esc(sessionUser==='admin'?'admin':byId(sessionUser)?.username||'user')}</span><button class="btn secondary sm" onclick="logout()">Log out</button><button class="btn secondary sm" onclick="setTheme(theme==='Light'?'Starlight':'Light')">${theme==='Light'?'☾ Starlight':'☀ Light'}</button>${role==='Admin'?`<button class="btn ghost sm" onclick="toggleNotifications()">♧ Notifications ${notices.filter(n=>!n.read).length?'('+notices.filter(n=>!n.read).length+')':''}</button>`:''}</div></header><div id="content">${page==='Dashboard'?dashboard():page==='Team Management'?team():page==='Administration'?administration():page==='Ultranet'?ultranet():activity()}</div></main></div><div id="modalroot">${modal?modalHTML():''}</div><div id="notifications" class="hidden"></div>`;if(page==='Team Management'&&view==='Hierarchy')requestAnimationFrame(setupHierarchyRails);requestAnimationFrame(showActiveBranchTab)}
+function render(){document.body.className=theme==='Starlight'?'dark':'';if(!sessionUser){$('root').innerHTML=loginScreen();return;}let nav=['Dashboard','Team Management',...(hasModule('Ultranet')?['Ultranet']:[]),...(hasModule('Activity History')?['Activity History']:[]),...(hasModule('Administration')?['Administration']:[])];$('root').innerHTML=`<div class="app"><aside class="side"><div class="brand">✦ Sales Team<br>Management</div>${nav.map((n,i)=>`<button class="nav ${page===n?'active':''}" data-nav="${n}" onclick="setPage('${n}')">${({'Dashboard':'◫','Team Management':'♧','Activity History':'◷','Administration':'⚙','Ultranet':'▤'})[n]} &nbsp; ${n}</button>`).join('')}</aside><main class="main"><header class="top"><div><h1>${esc(page)}</h1></div><div class="toolbar"><span class="muted">${esc(sessionUser==='admin'?'admin':byId(sessionUser)?.username||'user')}</span><button class="btn secondary sm" onclick="logout()">Log out</button><button class="btn secondary sm" onclick="setTheme(theme==='Light'?'Starlight':'Light')">${theme==='Light'?'☾ Starlight':'☀ Light'}</button>${role==='Admin'?`<button class="btn ghost sm" onclick="toggleNotifications()">♧ Notifications ${notices.filter(n=>!n.read).length?'('+notices.filter(n=>!n.read).length+')':''}</button>`:''}</div></header><div id="content">${page==='Dashboard'?dashboard():page==='Team Management'?team():page==='Administration'?administration():page==='Ultranet'?ultranet():activity()}</div></main></div><div id="modalroot">${modal?modalHTML():''}</div><div id="notifications" class="hidden"></div>`;requestAnimationFrame(showActiveBranchTab)}
 /* Multi-branch team assignment: supervisors can belong to several branches;
    advisors retain exactly one branch. Keep p.branch as the legacy primary branch. */
 function memberBranches(p){if(!p)return [];const saved=Array.isArray(p.branches)?p.branches.filter(Boolean):[];return p.role==='Member'?[p.branch].filter(Boolean):[...new Set(saved.length?saved:[p.branch].filter(Boolean))]}
@@ -1066,7 +1085,7 @@ function renderBranchHierarchy(){
     }
     const roots=eligible.filter(p=>kept.has(p.id)&&(!p.parent||!kept.has(p.parent)));
     const forest=roots.map(p=>`<div class="org-tree"><ul>${hierarchyNode(p,kept,new Set(),branchName)}</ul></div>`).join('');
-    return `<section class="hier-team"><div class="hier-team-label">${esc(branchName)}</div><div class="chart-scroll branch-chart-forest" onscroll="syncHierarchyFromChart(this)">${forest}</div><div class="hier-horizontal-bar" aria-label="Scroll hierarchy horizontally" onscroll="syncHierarchyFromTop(this)"><div class="hier-horizontal-range"></div></div></section>`;
+    return `<section class="hier-team"><div class="hier-team-label">${esc(branchName)}</div><div class="chart-scroll branch-chart-forest">${forest}</div></section>`;
   }).filter(Boolean).join('');
   return charts||'<div class="empty">No members in this branch.</div>';
 }
@@ -1460,7 +1479,7 @@ render=function(){
  if(role!=='Admin'){const bar=document.querySelector('header.top .toolbar');if(bar){const count=notices.filter(n=>!n.read).length;const b=document.createElement('button');b.className='btn ghost sm';b.textContent='♧ Notifications'+(count?' ('+count+')':'');b.onclick=toggleNotifications;bar.appendChild(b);}}
 };
 const _ultranetEditV29=ultranetEditForm;
-ultranetEditForm=function(){let p=byId(selected);const r=ultranetRecords.find(x=>x.memberId===selected);return `<div class="formgrid"><div><label>Full Name (Team Management)</label><div class="ultranet-linked-field">${esc(p?.name||'')}</div></div><div><label>Branch (Team Management)</label><div class="ultranet-linked-field">${esc(memberBranchText(p))}</div></div><div><label>Role (Team Management)</label><div class="ultranet-linked-field">${esc(p?.role||'')}</div></div><div><label>Status (Team Management)</label><div class="ultranet-linked-field">${esc(p?.status||'')}</div></div><div><label>User ID</label><input id="ultraID" value="${esc(r?.userId||'')}"></div>${canViewUltranetPassword()?`<div class="ultra-secret-form"><label for="ultraPW">Ultranet Password</label><div class="ultra-secret-entry"><input id="ultraPW" type="password" autocomplete="new-password" placeholder="Enter new password to change it" maxlength="512"><button type="button" class="btn ghost sm" onclick="toggleUltranetNewPassword()" aria-label="Show or hide password">Show</button></div><div class="muted" style="margin-top:6px">Leave blank to keep the existing password. Visible only with View Password permission.</div><button type="button" class="btn ghost sm" style="margin-top:8px" onclick="loadUltranetPasswordIntoEdit()">View existing password</button><button type="button" class="btn ghost sm" style="margin-top:8px" onclick="copyExistingUltranetPassword()">Copy password</button></div>`:''}</div><div class="account-scope-hint">Branch / Role are linked from Team Management. Changes there update Ultranet automatically.</div><div class="actions"><button class="btn" onclick="saveUltranetRecord()">Save</button>${r&&ulAllowed('Delete')?`<button class="btn danger" onclick="deleteUltranetRecord()">Delete Ultranet Entry</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`};
+ultranetEditForm=function(){let p=byId(selected);const r=ultranetRecords.find(x=>x.memberId===selected);return `<div class="formgrid"><div><label>Full Name (Team Management)</label><div class="ultranet-linked-field">${esc(p?.name||'')}</div></div><div><label>IC No. (Team Management)</label><div class="ultranet-linked-field">${esc(p?(canViewUltranetPassword()||role==='Admin'?p.ic:ic(p)):'')}</div></div><div><label>Branch (Team Management)</label><div class="ultranet-linked-field">${esc(memberBranchText(p))}</div></div><div><label>Role (Team Management)</label><div class="ultranet-linked-field">${esc(p?.role||'')}</div></div><div><label>Status (Team Management)</label><div class="ultranet-linked-field">${esc(p?.status||'')}</div></div><div><label>User ID</label><input id="ultraID" value="${esc(r?.userId||'')}"></div>${canViewUltranetPassword()?`<div class="ultra-secret-form"><label for="ultraPW">Ultranet Password</label><div class="ultra-secret-entry"><input id="ultraPW" type="password" autocomplete="new-password" placeholder="Enter new password to change it" maxlength="512"><button type="button" class="btn ghost sm" onclick="toggleUltranetNewPassword()" aria-label="Show or hide password">Show</button></div><div class="muted" style="margin-top:6px">Leave blank to keep the existing password. Visible only with View Password permission.</div><button type="button" class="btn ghost sm" style="margin-top:8px" onclick="loadUltranetPasswordIntoEdit()">View existing password</button><button type="button" class="btn ghost sm" style="margin-top:8px" onclick="copyExistingUltranetPassword()">Copy password</button></div>`:''}</div><div class="account-scope-hint">Branch / Role are linked from Team Management. Changes there update Ultranet automatically.</div><div class="actions"><button class="btn" onclick="saveUltranetRecord()">Save</button>${r&&ulAllowed('Delete')?`<button class="btn danger" onclick="deleteUltranetRecord()">Delete Ultranet Entry</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`};
 // Preview-only cross-tab realtime: common browser origin + BroadcastChannel, no cross-device server.
 let syncChannel=null;
 try{if(typeof BroadcastChannel!=='undefined'){syncChannel=new BroadcastChannel('sales-team-clean-v40');syncChannel.onmessage=e=>{if(!e.data||e.data.type!=='system-update')return;const snapshot=e.data.snapshot;if(!snapshot)return;people=snapshot.people;branchData=snapshot.branchData;branches=branchData.map(x=>x.name);history=snapshot.history;notices=snapshot.notices;ultranetRecords=snapshot.ultranetRecords;render();};}}catch(e){console.warn('Preview cross-tab sync not available',e)}
@@ -1836,5 +1855,91 @@ saveRoleSetup=async function(){
 };
 const v63Logout=logout;
 logout=async function(){for(const t of ultranetRevealTimeouts.values())clearTimeout(t);ultranetRevealTimeouts.clear();ultranetServerPermission=false;ultranetPasswordIds.clear();return v63Logout()};
+
+
+/* v65: Admin / Salesperson categories, authentic account provisioning and audit listing */
+let accountCategory='Admin', createAccountCategory='Salesperson', accountDirectoryQuery='', adminAccountDirectory=[], selectedLoginMemberId=null;
+let accountDirectoryLoading=false;
+const safeAttr=esc;
+function linkedUltranetId(memberId){return String(ultranetRecords.find(x=>Number(x.memberId)===Number(memberId))?.userId||'').trim()}
+function salesRoleBadge(r){const cls=r==='Manager'?'manager':r==='Leader'?'leader':r==='Superadmin'?'superadmin':'member';return `<span class="user-role-pill ${cls}">${esc(r==='Member'?'Sales Advisor':r==='Leader'?'Team Leader':r==='Manager'?'Sales Manager':r)}</span>`}
+async function accountAdminRequest(payload){
+ if(!salesAuthAccessToken)throw Error('Please sign in as Administrator.');
+ const res=await fetch(SALES_AUTH_URL+'/functions/v1/sales-user-admin',{method:'POST',headers:{'apikey':SALES_AUTH_KEY,'Authorization':'Bearer '+salesAuthAccessToken,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ let data={};try{data=await res.json()}catch(e){}
+ if(!res.ok)throw Error(data.error||'Account service failed ('+res.status+')');
+ return data;
+}
+async function fetchAccountDirectory(){
+ if(!salesAuthAccessToken||accountDirectoryLoading)return;
+ accountDirectoryLoading=true;
+ try {const data=await accountAdminRequest({action:'list'});adminAccountDirectory=Array.isArray(data.accounts)?data.accounts:[];if(page==='Administration'&&adminTab==='User Management')render();}
+ catch(err){console.warn('Account directory unavailable:',err);}
+ finally{accountDirectoryLoading=false}
+}
+const _loginV65=login;
+login=async function(){await _loginV65();if(sessionUser==='admin')fetchAccountDirectory()};
+const _restoreSessionV65=restoreSalesSession;
+restoreSalesSession=async function(){await _restoreSessionV65();if(sessionUser==='admin')fetchAccountDirectory()};
+function selectUserCategory(value){accountCategory=value;render()}
+function searchUserDirectory(value){accountDirectoryQuery=value;const el=document.getElementById('user-directory-rows');if(el)el.innerHTML=userDirectoryRows()}
+function userDirectoryRows(){
+ let list=[];
+ if(accountCategory==='Admin'){
+  list=[{id:'root',name:'Administrator',username:'admin',role:'Superadmin',branch:'All Branches',state:'Enabled',kind:'Admin'}];
+  for(const x of adminAccountDirectory.filter(x=>x.category==='Admin'&&x.username!=='admin'))list.push({id:x.id,name:x.full_name,username:x.username,role:x.role||'Admin',branch:'All Branches',state:x.enabled?'Enabled':'Disabled',kind:'Admin'});
+ }else{
+  list=people.map(p=>{const account=adminAccountDirectory.find(a=>a.category==='Salesperson'&&Number(a.member_id)===Number(p.id));return {id:p.id,name:p.name,username:linkedUltranetId(p.id)||'Not assigned',role:p.role,branch:memberBranchText(p),state:account?(account.enabled?'Enabled':'Disabled'):'Not created',account,kind:'Salesperson'};});
+ }
+ const kw=accountDirectoryQuery.toLowerCase().trim();
+ if(kw)list=list.filter(x=>[x.name,x.username,x.role,x.branch,x.state].some(v=>String(v||'').toLowerCase().includes(kw)));
+ return list.map(x=>`<tr><td><strong>${esc(x.name)}</strong></td><td>${esc(x.username)}</td><td>${salesRoleBadge(x.role)}</td><td>${esc(x.branch||'—')}</td><td><span class="pill ${x.state!=='Enabled'?'off':''}">${esc(x.state)}</span></td><td>${x.kind==='Admin'?`<button class="btn ghost sm" onclick="openAuthenticatedAdminDetails()">View</button>`:`<button class="btn ghost sm" ${x.username==='Not assigned'?'disabled':''} onclick="openSalespersonAccount(${Number(x.id)})">${x.account?'Manage':'Create Login'}</button>`}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching users</td></tr>';
+}
+userManagement=function(){return `<div class="toolbar" style="justify-content:space-between;margin-bottom:16px"><h2 style="margin:0">User Management</h2><button class="btn sm" onclick="openCategorizedAccountCreate()">+ Create User</button></div>
+<div class="user-category-tabs"><button class="${accountCategory==='Admin'?'active':''}" onclick="selectUserCategory('Admin')">Admin</button><button class="${accountCategory==='Salesperson'?'active':''}" onclick="selectUserCategory('Salesperson')">Salesperson</button></div>
+<input class="user-directory-search" type="search" placeholder="Search" aria-label="Search User ID and Role" value="${esc(accountDirectoryQuery)}" oninput="searchUserDirectory(this.value)">
+<div class="tablewrap"><table><thead><tr><th>Full Name</th><th>User ID</th><th>Role</th><th>Branch</th><th>Account Status</th><th>Details</th></tr></thead><tbody id="user-directory-rows">${userDirectoryRows()}</tbody></table></div>`};
+function openCategorizedAccountCreate(){createAccountCategory='Salesperson';selectedLoginMemberId=null;modal='categorizedAccount';render();}
+function switchNewAccountCategory(category){createAccountCategory=category;selectedLoginMemberId=null;render()}
+function newAccountMemberPicker(){return people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}">${esc(p.name)} · ${esc(linkedUltranetId(p.id)||'No Ultranet User ID')} · ${esc(p.role)}</option>`).join('')}
+function refreshCategorizedAccountSummary(){const select=$('accountPersonId'),id=Number(select?.value),p=byId(id);selectedLoginMemberId=p?.id||null;const box=$('categorizedLinkedSummary');if(box)box.innerHTML=p?accountLinkedInfo(p):'Select a Team Management member.';}
+function accountLinkedInfo(p){const id=linkedUltranetId(p.id);const exists=adminAccountDirectory.find(x=>x.category==='Salesperson'&&Number(x.member_id)===Number(p.id));return `<div class="user-linked-details"><div><label>Full Name</label><b>${esc(p.name)}</b></div><div><label>User ID (Ultranet)</label><b>${esc(id||'Not assigned')}</b></div><div><label>Role</label>${salesRoleBadge(p.role)}</div><div><label>Branch</label><b>${esc(memberBranchText(p))}</b></div></div>${!id?'<p class="muted">Set the Ultranet User ID before creating a login.</p>':''}${exists?'<p class="muted">This member already has an account. Use Manage to reset the password.</p>':''}`}
+function categorizedAccountForm(){
+ const category=createAccountCategory;
+ const chosen=byId(selectedLoginMemberId)||people.find(p=>p.status==='Active');
+ return `<div class="user-category-modal-row"><button class="btn ${category==='Admin'?'':'secondary'}" onclick="switchNewAccountCategory('Admin')">Admin</button><button class="btn ${category==='Salesperson'?'':'secondary'}" onclick="switchNewAccountCategory('Salesperson')">Salesperson</button></div>
+${category==='Salesperson'?`<label>Salesperson (Team Management)</label><select id="accountPersonId" onchange="refreshCategorizedAccountSummary()" style="width:100%;max-width:none"><option value="">Select Member</option>${people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}" ${Number(chosen?.id)===Number(p.id)?'selected':''}>${esc(p.name)} — ${esc(p.role)}</option>`).join('')}</select><div id="categorizedLinkedSummary">${chosen?accountLinkedInfo(chosen):''}</div>`:`<div class="user-linked-details"><div><label>Admin Category</label><b>Existing administrator: admin</b></div></div><p class="muted">Additional administrator accounts require a dedicated administrator invitation process. No new administrator will be created from this form.</p>`}
+${category==='Salesperson'?`<label style="display:block;margin-top:14px">Login Password *</label><input type="password" id="categoryPassword" autocomplete="new-password" minlength="10" placeholder="Minimum 10 characters"><p class="user-category-note">Name, Branch, Role and User ID are linked automatically. Password is sent to Supabase Auth, never saved in workspace data. Staff sign-in and branch-specific access remain restricted until role-based access is completed.</p>`:''}
+<div class="actions" style="margin-top:20px">${category==='Salesperson'?'<button class="btn" id="categoryCreateButton" onclick="saveCategorizedAccount()">Create User</button>':''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
+}
+async function saveCategorizedAccount(){
+ const id=Number($('accountPersonId')?.value),p=byId(id),password=$('categoryPassword')?.value||'',username=linkedUltranetId(id).toLowerCase();
+ if(!p||p.status!=='Active')return showModalError('Select an active salesperson.');
+ if(!username)return showModalError('Please set this member’s Ultranet User ID first.');
+ if(!/^[a-z0-9][a-z0-9._-]{2,59}$/.test(username))return showModalError('User ID must be 3–60 letters, numbers, periods, dashes or underscores.');
+ if(password.length<10)return showModalError('Password must be at least 10 characters.');
+ const button=$('categoryCreateButton');if(button)button.disabled=true;
+ try{await accountAdminRequest({action:'create_salesperson',member_id:p.id,username,full_name:p.name,role:p.role,password});
+ log('Create User',p.name+' login provisioned');modal='';accountCategory='Salesperson';await fetchAccountDirectory();render();
+ }catch(err){showModalError(err.message)}finally{if(button&&button.isConnected)button.disabled=false}
+}
+function openSalespersonAccount(id){selectedLoginMemberId=id;modal='salespersonAccount';render()}
+function salespersonAccountForm(){const p=byId(selectedLoginMemberId);if(!p)return 'Member not found';const active=adminAccountDirectory.find(x=>x.category==='Salesperson'&&Number(x.member_id)===Number(p.id));return `${accountLinkedInfo(p)}${active?`<label>New Login Password</label><input id="salesResetPassword" type="password" autocomplete="new-password" placeholder="Minimum 10 characters"><div class="actions" style="margin-top:18px"><button class="btn" onclick="resetSalespersonPassword()">Update Password</button><button class="btn ghost" onclick="closeModal()">Close</button></div>`:`<div class="actions"><button class="btn" onclick="selectedLoginMemberId=${Number(p.id)};createAccountCategory='Salesperson';modal='categorizedAccount';render()">Create User</button><button class="btn ghost" onclick="closeModal()">Close</button></div>`}`}
+async function resetSalespersonPassword(){const pw=$('salesResetPassword')?.value||'';if(pw.length<10)return showModalError('Use at least 10 characters.');try{await accountAdminRequest({action:'reset_salesperson',member_id:selectedLoginMemberId,password:pw});log('Reset Password',byId(selectedLoginMemberId)?.name+' login password reset');closeModal()}catch(err){showModalError(err.message)}}
+const _modalV65=modalHTML;
+modalHTML=function(){
+ if(!['categorizedAccount','salespersonAccount'].includes(modal))return _modalV65();
+ return `<div class="overlay"><div class="modal wide-modal" role="dialog" aria-modal="true"><div class="toolbar" style="justify-content:space-between"><h2>${modal==='categorizedAccount'?'Create User':'Salesperson Account'}</h2><button class="btn ghost sm" onclick="closeModal()">✕</button></div><p id="modalError" class="moto-error"></p>${modal==='categorizedAccount'?categorizedAccountForm():salespersonAccountForm()}</div></div>`;
+};
+/* Auditable UI: display User ID, module and the action performed. */
+function activityModuleFromEvent(h){if(h.module)return h.module;const t=(String(h.action||'')+' '+String(h.detail||'')).toLowerCase();if(/ultranet/.test(t))return 'Ultranet';if(/branch/.test(t))return 'Administration / Branch Setup';if(/role setup|permissions|login|password|account|create user|edit user/.test(t))return 'Administration';if(/member|report|transfer|hierarchy|inactive|status/.test(t))return 'Team Management';return 'System'}
+function auditUserId(h){if(h.userId)return h.userId;if(h.actor==='Administrator'||h.actor==='admin'||h.actor==='Superadmin')return 'admin';return String(h.actor||'Unknown')}
+function auditActionText(h){return String(h.action||'—')}
+const _gridRowsV65=gridRows;
+gridRows=function(kind){if(kind!=='activity')return _gridRowsV65(kind);return history.map((h,i)=>({...h,_id:i,userId:auditUserId(h),module:activityModuleFromEvent(h),action:auditActionText(h)}))};
+gridColumns.activity=[['time','Date & Time'],['userId','Performed By'],['module','Module'],['action','Action'],['detail','Description']];
+const _gridBodyV65=gridBody;
+gridBody=function(kind){if(kind!=='activity')return _gridBodyV65(kind);return gridFiltered('activity').map(h=>`<tr><td>${esc(h.time)}</td><td>${esc(h.userId)}</td><td>${esc(h.module)}</td><td>${esc(h.action)}</td><td>${esc(h.detail)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No activity</td></tr>'};
+log=function(action,detail){const module=activityModuleFromEvent({action,detail});const userId=sessionUser==='admin'?'admin':String(byId(sessionUser)?.username||'Unknown');const entry={time:new Date().toLocaleString(),userId,actor:userId,module,action,detail};history.unshift(entry);notices.unshift({time:entry.time,action,detail,read:false});persist()};
 
 </script></body></html>
