@@ -901,6 +901,24 @@ body.hierarchy-page-scroll .side{flex-shrink:0}
 .activity-action-badge.edit{background:#eaf1ff;color:#3d72bb}
 .activity-action-badge.delete{background:#ffebee;color:#b74657}
 
+
+/* v67: hierarchy uses the browser document scrollbar, not a chart's scrollport.
+   v66 had its body class removed by the original render() and the global
+   html overflow-x:clip prevented the browser-level bar from appearing. */
+html.hierarchy-document-scroll{overflow-x:auto!important;max-width:none!important}
+html.hierarchy-document-scroll body{overflow-x:visible!important;max-width:none!important;width:max-content!important;min-width:100%!important}
+html.hierarchy-document-scroll body .app{width:max-content!important;min-width:100vw!important;max-width:none!important}
+html.hierarchy-document-scroll body .main,
+html.hierarchy-document-scroll body #content,
+html.hierarchy-document-scroll body #content>.card,
+html.hierarchy-document-scroll body .new-hier,
+html.hierarchy-document-scroll body .hier-team,
+html.hierarchy-document-scroll body .chart-scroll{overflow-x:visible!important;overflow-y:visible!important;max-width:none!important}
+html.hierarchy-document-scroll body .new-hier,
+html.hierarchy-document-scroll body .hier-team,
+html.hierarchy-document-scroll body .chart-scroll{width:max-content!important}
+html.hierarchy-document-scroll body .hier-horizontal-bar{display:none!important}
+
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1990,8 +2008,12 @@ log=function(action,detail){const module=activityModuleFromEvent({action,detail}
 /* v66 hierarchy page scrolling, and detailed activity rendering */
 const v66RenderOriginal=render;
 render=function(){
- document.body.classList.toggle('hierarchy-page-scroll',!!sessionUser&&page==='Team Management'&&view==='Hierarchy');
+ // The original renderer resets body.className (for theme switching).
+ // Apply the hierarchy-only page overflow class AFTER it finishes.
  v66RenderOriginal();
+ const usePageScroll=!!sessionUser&&page==='Team Management'&&view==='Hierarchy';
+ document.body.classList.toggle('hierarchy-page-scroll',usePageScroll);
+ document.documentElement.classList.toggle('hierarchy-document-scroll',usePageScroll);
 };
 function normalizeAuditAction(action){
  const a=String(action||'').toLowerCase();
