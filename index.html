@@ -838,6 +838,16 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 @media(max-width:780px){.dashboard-five-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}}
 @media(max-width:440px){.dashboard-five-kpis .dashboard-kpi{min-height:140px;padding:12px!important}.dashboard-five-kpis .dashboard-kpi .stat-heading small{font-size:11px}.dashboard-five-kpis .dashboard-kpi b{font-size:29px}.dashboard-five-kpis .dashboard-kpi>small{font-size:10px}}
 
+
+/* v59 Dashboard: exact role color palette, multi-manager name rows */
+.dashboard-five-kpis .dashboard-kpi-branches{--stat-gradient:linear-gradient(130deg,#f17daf,#ffd2e3);--stat-accent:#d84d91}
+.dashboard-five-kpis .dashboard-kpi-members{--stat-gradient:linear-gradient(130deg,#9162e6,#dfc8ff);--stat-accent:#8656d6}
+.dashboard-five-kpis .dashboard-kpi-managers{--stat-gradient:linear-gradient(130deg,#437ee8,#b6d6ff);--stat-accent:#3975d2}
+.dashboard-five-kpis .dashboard-kpi-leaders{--stat-gradient:linear-gradient(130deg,#19aca7,#b4eee6);--stat-accent:#109b9b}
+.dashboard-five-kpis .dashboard-kpi-advisors{--stat-gradient:linear-gradient(130deg,#ed963e,#ffdbad);--stat-accent:#dc872d}
+.branch-gallery .branch-manager-name{display:block;line-height:1.55;overflow-wrap:anywhere}
+.branch-gallery .branch-manager-name + .branch-manager-name{margin-top:3px}
+
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -931,7 +941,7 @@ function dashboard(){
  const activeBranches=branchData.filter(b=>b.status==='Active').length;
  const kpis=[
    {label:'Total Branches',value:activeBranches,note:'Active branches',kind:'branches',icon:'⌂'},
-   {label:'Total Active Members',value:list.length,note:'Unique active members',kind:'members',icon:'◈'},
+   {label:'Total Active Members',value:list.length,note:'Active members',kind:'members',icon:'◈'},
    {label:'Sales Managers',value:count('Manager'),note:'Active managers',kind:'managers',icon:'♙'},
    {label:'Team Leaders',value:count('Leader'),note:'Active leaders',kind:'leaders',icon:'◇'},
    {label:'Sales Advisors',value:count('Member'),note:'Active advisors',kind:'advisors',icon:'♧'}
@@ -940,7 +950,7 @@ function dashboard(){
  <div class="dashboard-branch-heading"><h2>Our Branches</h2><span>${activeBranches} ${activeBranches===1?'branch':'branches'}</span></div>
  <div class="branch-gallery">${branchData.map(b=>{
  const branchActive=list.filter(p=>memberInBranch(p,b.name)),ms=branchActive.filter(p=>p.role==='Manager'),leaderCount=branchActive.filter(p=>p.role==='Leader').length,advisorCount=branchActive.filter(p=>p.role==='Member').length,totalBranch=ms.length+leaderCount+advisorCount;
- return `<div class="card branch-card" role="button" tabindex="0" title="Open ${esc(b.name)} Team Management" aria-label="Open ${esc(b.name)} Team Management" onclick="openDashboardBranch(decodeURIComponent('${encodeURIComponent(b.name)}'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"><div class="branch-cover">${b.photo?`<img src="${esc(b.photo)}" style="object-position:${Number(b.photoX??50)}% ${Number(b.photoY??50)}%;transform-origin:${Number(b.photoX??50)}% ${Number(b.photoY??50)}%;transform:scale(${zoomBounds(b.photoZoom??1)})" alt="${esc(b.name)} branch">`:'<span class="fallback">⌂</span>'}</div><div class="branch-info"><div class="branch-head"><div class="branch-title-stack"><strong>${esc(b.name)}</strong>${b.branchName?`<small class="branch-subtitle">${esc(b.branchName)}</small>`:''}</div><span class="branch-total" title="Total active managers, leaders and sales advisors">${totalBranch} ${totalBranch===1?'person':'people'}</span></div><div class="branch-role-counts"><div><b>${ms.length}</b><small>Manager${ms.length===1?'':'s'}</small></div><div><b>${leaderCount}</b><small>Leader${leaderCount===1?'':'s'}</small></div><div><b>${advisorCount}</b><small>Sales Advisor${advisorCount===1?'':'s'}</small></div></div><div class="branch-managers"><b>Branch Manager${ms.length===1?'':'s'}</b><div style="margin-top:7px">${ms.map(m=>esc(m.name)).join(', ')||'Not assigned'}</div></div></div></div>`
+ return `<div class="card branch-card" role="button" tabindex="0" title="Open ${esc(b.name)} Team Management" aria-label="Open ${esc(b.name)} Team Management" onclick="openDashboardBranch(decodeURIComponent('${encodeURIComponent(b.name)}'))" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"><div class="branch-cover">${b.photo?`<img src="${esc(b.photo)}" style="object-position:${Number(b.photoX??50)}% ${Number(b.photoY??50)}%;transform-origin:${Number(b.photoX??50)}% ${Number(b.photoY??50)}%;transform:scale(${zoomBounds(b.photoZoom??1)})" alt="${esc(b.name)} branch">`:'<span class="fallback">⌂</span>'}</div><div class="branch-info"><div class="branch-head"><div class="branch-title-stack"><strong>${esc(b.name)}</strong>${b.branchName?`<small class="branch-subtitle">${esc(b.branchName)}</small>`:''}</div><span class="branch-total" title="Total active managers, leaders and sales advisors">${totalBranch} ${totalBranch===1?'person':'people'}</span></div><div class="branch-role-counts"><div><b>${ms.length}</b><small>Manager${ms.length===1?'':'s'}</small></div><div><b>${leaderCount}</b><small>Leader${leaderCount===1?'':'s'}</small></div><div><b>${advisorCount}</b><small>Sales Advisor${advisorCount===1?'':'s'}</small></div></div><div class="branch-managers"><b>Branch Manager${ms.length===1?'':'s'}</b><div style="margin-top:7px">${ms.length?ms.map(m=>`<div class="branch-manager-name">${esc(m.name)}</div>`).join(''):'Not assigned'}</div></div></div></div>`
  }).join('')}</div>`;
 }
 function openDashboardBranch(branchName){if(!hasModule('Team Management'))return notify('Access denied.');branchFilter=branchName;managerFilter='All';statusFilter='Active';roleFilter='All';search='';columnFilters={name:null,ic:null,branch:null,role:null,status:null};filterPopup=null;filterKeyword='';filterExcluded=new Set();pageNo=1;view='List';exportOpen=false;page='Team Management';selected=null;modal='';render();}
