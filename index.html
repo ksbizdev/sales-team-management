@@ -648,6 +648,36 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 .moto-hero-photo{z-index:1}
 .moto-lightfield{z-index:2}
 
+
+/* v45: exact image-aspect hero. No blurred side strips, cropping or stretch. */
+.moto-login-shell{
+  grid-template-columns:minmax(0,1.03fr) minmax(405px,.97fr);
+  min-height:0!important;
+  height:auto!important;
+  align-items:stretch;
+}
+.moto-hero{
+  min-height:0!important;
+  height:auto!important;
+  aspect-ratio:892 / 796;
+  align-self:stretch;
+  background:#081633;
+}
+.moto-hero::before{content:none!important;display:none!important;}
+.moto-hero-photo{
+  inset:0!important;
+  background-size:100% 100%!important;
+  background-repeat:no-repeat!important;
+  background-position:center center!important;
+  transform:none!important;
+  animation:none!important;
+  filter:none!important;
+}
+@media(max-width:950px){
+ .moto-login-shell{grid-template-columns:minmax(0,1fr)!important;max-width:700px!important;}
+ .moto-hero{width:100%;height:auto!important;aspect-ratio:892 / 796!important;}
+}
+
 </style></head><body><div id="root"></div><script>
 const initial=[];
 let filterKeyword="",filterExcluded=new Set();let columnFilters={name:null,ic:null,branch:null,role:null,status:null},sortColumn='',sortDirection=1,filterPopup=null,memberModalError='',transferSearch='';let people=initial.map(x=>({...x})),branches=[],history=[],notices=[],page='Dashboard',role='Admin',actor=0,theme='Light',view='List',statusFilter='Active',search='',branchFilter='All',roleFilter='All',managerFilter='All',showInactive=false,selected=null,modal='',adminTab='User Management',pageNo=1,perPage=10,exportOpen=false;
