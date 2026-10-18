@@ -854,6 +854,8 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 .ultranet-password-info{font-size:12px;color:#75829c;margin:12px 0 8px;line-height:1.5}
 .dark .ultranet-password-unavailable,.dark .ultranet-password-info{color:#b0bfdf}
 
+
+.user-admin-search{margin:0 0 14px;max-width:390px}.user-admin-search input{width:100%;max-width:none}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1665,5 +1667,85 @@ function showRestoringShell(message='Restoring your session…', action=''){
 async function retrySalesSession(){showRestoringShell();await restoreSalesSession()}
 function initializeSalesUI(){let saved=null;try{saved=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}if(saved?.refresh_token){showRestoringShell();restoreSalesSession();}else{render();}}
 initializeSalesUI();
+
+
+/* v62: Supabase-authenticated administrator appears in User Management; Superadmin is a
+   reserved, full-access UI role. Credentials are never loaded into workspace JSON. */
+const _usersRowsV62 = gridRows;
+gridRows = function(kind){
+ const rows=_usersRowsV62(kind);
+ if(kind!=='users')return rows;
+ if(sessionUser==='admin' && !rows.some(x=>String(x.username||'').toLowerCase()==='admin')){
+   rows.unshift({name:'Administrator',username:'admin',role:'Superadmin',branch:'All Branches',status:'Enabled',_id:'__supabase_superadmin__'});
+ }
+ return rows;
+};
+let userManagementKeyword='';
+const _gridFilteredV62=gridFiltered;
+gridFiltered=function(kind){
+ let rows=_gridFilteredV62(kind);
+ if(kind==='users'&&userManagementKeyword.trim()){
+   const q=userManagementKeyword.trim().toLowerCase();
+   rows=rows.filter(r=>['name','username','role','branch','status'].some(k=>String(r[k]??'').toLowerCase().includes(q)));
+ }
+ return rows;
+};
+function searchUserManagement(value){
+ userManagementKeyword=value;
+ const body=document.getElementById('users-grid-body');
+ if(body)body.innerHTML=gridBody('users');
+}
+const _gridBodyV62=gridBody;
+gridBody=function(kind){
+ if(kind!=='users')return _gridBodyV62(kind);
+ const rows=gridFiltered('users');
+ return rows.map(r=>{
+  if(r._id==='__supabase_superadmin__')return `<tr class="admin-row" onclick="openAuthenticatedAdminDetails()"><td><strong>${esc(r.name)}</strong></td><td>${esc(r.username)}</td><td><span class="pill">Superadmin</span></td><td>All Branches</td><td><span class="pill active">Enabled</span></td><td><button class="btn ghost sm" onclick="event.stopPropagation();openAuthenticatedAdminDetails()">View</button></td></tr>`;
+  return `<tr class="admin-row" onclick="openUserEditor(${Number(r._id)})"><td><strong>${esc(r.name)}</strong></td><td>${esc(r.username)}</td><td>${esc(r.role)}</td><td>${esc(r.branch)}</td><td><span class="pill ${r.status!=='Enabled'?'off':''}">${esc(r.status)}</span></td><td><button class="btn ghost sm" onclick="event.stopPropagation();openUserEditor(${Number(r._id)})">Edit</button> <button class="btn ghost sm" ${r.username==='Not created'?'disabled':''} onclick="event.stopPropagation();openPasswordReset(${Number(r._id)})">Reset Password</button></td></tr>`;
+ }).join('')||'<tr><td colspan="6" class="empty">No matching users</td></tr>';
+};
+const _userManagementV62=userManagement;
+userManagement=function(){
+ const markup=_userManagementV62();
+ return markup.replace(''+gridTable('users'),`<div class="user-admin-search"><input type="search" aria-label="Search users" placeholder="Search User ID, Name or Role" value="${esc(userManagementKeyword)}" oninput="searchUserManagement(this.value)"></div>${gridTable('users')}`);
+};
+function openAuthenticatedAdminDetails(){modal='superadminProfile';render()}
+const _modalV62=modalHTML;
+modalHTML=function(){
+ if(modal!=='superadminProfile')return _modalV62();
+ return `<div class="overlay"><div class="modal" role="dialog" aria-modal="true"><div class="toolbar" style="justify-content:space-between"><h2>Superadmin Account</h2><button class="btn ghost sm" onclick="closeModal()">✕</button></div><div class="formgrid"><div><label>User ID</label><div class="ultranet-linked-field">admin</div></div><div><label>Role</label><div class="ultranet-linked-field">Superadmin</div></div><div><label>Account Status</label><div class="ultranet-linked-field">Enabled</div></div><div><label>Branch Access</label><div class="ultranet-linked-field">All Branches</div></div></div><p class="muted" style="margin:18px 0">This is your authenticated Supabase administrator account. Email, password and privileged role changes must be managed using the secure Supabase Auth and server-side administration workflow.</p><div class="actions"><button class="btn ghost" onclick="closeModal()">Close</button></div></div></div>`;
+};
+// A Superadmin role template always grants every supported action. It cannot be downgraded
+// by an editable browser-side checkbox or deleted from the role listing.
+function fullSuperadminPermissions(){
+ return Object.fromEntries(modules.map(m=>[m,[...new Set([...(moduleCapabilities[m]||[]),'View','Add','Edit','Delete','Export',...(m==='Ultranet'?['View Password']:[]),'All Branches'])]]));
+}
+const _roleTemplateV62=roleTemplate;
+roleTemplate=function(name){return name==='Superadmin'?fullSuperadminPermissions():_roleTemplateV62(name)};
+function ensureSuperadminRole(){
+ roleSetupNames=['Superadmin',...roleSetupNames.filter(n=>n!=='Superadmin')];
+ roleTemplates.Superadmin=fullSuperadminPermissions();
+}
+const _cloudApplyV62=cloudApply;
+cloudApply=function(payload){_cloudApplyV62(payload);ensureSuperadminRole()};
+const _loadRolesV62=loadRoleTemplates;
+loadRoleTemplates=function(){_loadRolesV62();ensureSuperadminRole()};
+const _editRoleV62=editSetupRole;
+editSetupRole=function(name){_editRoleV62(name)};
+const _roleSetupV62=roleSetup;
+roleSetup=function(){
+ ensureSuperadminRole();
+ const markup=_roleSetupV62();
+ if(roleSetupScreen==='edit'&&roleSetupSelected==='Superadmin'){
+   return markup.replaceAll('class="permcheck" type="checkbox"','class="permcheck" type="checkbox" disabled').replace('<div class="actions" style="margin-top:18px"><button class="btn" onclick="saveRoleSetup()">Save Permissions</button>',
+    '<p class="muted">Superadmin has all permissions by default. This protected role cannot be downgraded in the browser.</p><div class="actions" style="margin-top:18px"><button class="btn" onclick="roleSetupScreen=\'listing\';render()">Back to Listing</button>');
+ }
+ return markup.replace(/onclick="event.stopPropagation\(\);deleteSetupRole\('Superadmin'\)"/g,'disabled title="Protected system role"');
+};
+const _deleteSetupRoleV62=deleteSetupRole;
+deleteSetupRole=function(name){if(name==='Superadmin')return roleMessage('Superadmin is a protected system role.');return _deleteSetupRoleV62(name)};
+const _saveRoleSetupV62=saveRoleSetup;
+saveRoleSetup=function(){if(roleSetupSelected==='Superadmin')return roleMessage('Superadmin always has all permissions.');return _saveRoleSetupV62()};
+ensureSuperadminRole();
 
 </script></body></html>
