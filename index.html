@@ -877,6 +877,30 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 .user-linked-details b{font-size:14px}
 .user-category-note{color:#8490a7;font-size:12px;line-height:1.6;margin-top:12px}
 @media(max-width:540px){.user-linked-details{grid-template-columns:1fr}.user-category-tabs button{flex:1}}
+
+/* v66: one browser/page horizontal scrollbar for hierarchy, never a chart scrollbar */
+body.hierarchy-page-scroll{overflow-x:auto!important}
+body.hierarchy-page-scroll #root,
+body.hierarchy-page-scroll .app{max-width:none!important;min-width:100vw!important;width:max-content!important}
+body.hierarchy-page-scroll .main{max-width:none!important;width:max-content!important;min-width:calc(100vw - 245px)!important;overflow:visible!important}
+body.hierarchy-page-scroll .main #content,
+body.hierarchy-page-scroll .main #content>.card{width:max-content!important;min-width:calc(100vw - 315px)!important;max-width:none!important;overflow:visible!important}
+body.hierarchy-page-scroll .new-hier,
+body.hierarchy-page-scroll .hier-team{overflow:visible!important;width:max-content!important;max-width:none!important;min-width:100%!important}
+body.hierarchy-page-scroll .chart-scroll{overflow:visible!important;max-width:none!important;width:max-content!important;min-width:100%!important;padding-bottom:14px}
+body.hierarchy-page-scroll .hier-horizontal-bar{display:none!important}
+body.hierarchy-page-scroll .branch-tabs-shell{max-width:calc(100vw - 315px)}
+body.hierarchy-page-scroll .side{flex-shrink:0}
+@media(max-width:900px){body.hierarchy-page-scroll .main{min-width:calc(100vw - 72px)!important}body.hierarchy-page-scroll .main #content,body.hierarchy-page-scroll .main #content>.card{min-width:calc(100vw - 120px)!important}body.hierarchy-page-scroll .branch-tabs-shell{max-width:calc(100vw - 120px)}}
+@media(max-width:700px){body.hierarchy-page-scroll .main{min-width:100vw!important}body.hierarchy-page-scroll .main #content,body.hierarchy-page-scroll .main #content>.card{min-width:calc(100vw - 28px)!important}body.hierarchy-page-scroll .branch-tabs-shell{max-width:calc(100vw - 28px)}}
+.admin-create-form{display:grid;gap:14px;margin:16px 0}
+.admin-create-form label{display:block;font-size:12px;font-weight:750;margin-bottom:7px;color:#687995}
+.admin-create-form input{width:100%;max-width:none}
+.activity-action-badge{display:inline-block;border-radius:9px;padding:5px 10px;background:#eef1ff;color:#545ec4;font-weight:750;font-size:12px}
+.activity-action-badge.add{background:#e6f8f0;color:#247d5b}
+.activity-action-badge.edit{background:#eaf1ff;color:#3d72bb}
+.activity-action-badge.delete{background:#ffebee;color:#b74657}
+
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1109,11 +1133,12 @@ function backToDetails(){modal='details';memberModalError='';render()}function o
   if(parent&&byId(parent)?.role===newRole)return memberFormError('The same Role cannot report to the same Role.');
   if(newRole==='Manager')parent=null;
   const p={id:Math.max(0,...people.map(x=>x.id))+1,name,ic:number,branch,branches:newRole==='Member'?[branch]:chosenBranches,role:newRole,parent,status:'Active',username:null,enabled:false};
-  people.push(p);log('Add Member',`${name} added`);
+  people.push(p);log('Add Member',`${name}: IC No. ${number}; Role ${newRole}; Branch ${chosenBranches.join(', ')}; Reporting To ${byId(parent)?.name||'None'}`);
  }else{
   const p=byId(selected);
   if(!p||!canEdit(p))return memberFormError('Not authorized to edit this member.');
   const oldRole=p.role;
+  const originalMember={name:p.name,ic:p.ic,role:p.role,branch:p.branch,branches:memberBranches(p).join(', '),parent:p.parent};
   if(newRole!==oldRole){
    if(!canAction('Team Management','Edit')&&role!=='Admin')return memberFormError('No permission to edit Role.');
    if(role!=='Admin'&&(newRole==='Manager'||oldRole==='Manager'))return memberFormError('Only Admin can change Manager Role.');
@@ -1132,7 +1157,9 @@ function backToDetails(){modal='details';memberModalError='';render()}function o
    p.parent=nextParent;
   }
   p.name=name;p.ic=number;p.branch=branch;p.branches=newRole==='Member'?[branch]:chosenBranches;
-  log('Edit Member',`${name} updated`);
+  const changes=[];
+  for(const [label,a,b] of [['Full Name',originalMember.name,p.name],['IC No.',originalMember.ic,p.ic],['Role',originalMember.role,p.role],['Branch',originalMember.branches,memberBranches(p).join(', ')],['Reporting To',byId(originalMember.parent)?.name||'Not assigned',byId(p.parent)?.name||'Not assigned']])if(String(a)!==String(b))changes.push(`${label}: ${a} → ${b}`);
+  log('Edit Member',`${name}: ${changes.length?changes.join('; '):'No field changes'}`);
  }
  // Ultranet Full Name, Branch, Role and Status are linked from the same member profile.
  // Its table renders directly from people and will reflect changes on the next render.
@@ -1339,7 +1366,7 @@ function branchFileSelected(e){
  };
  reader.readAsDataURL(file);
 }
-function saveBranchEditor(){if(branchPhotoLoading)return showModalError('Please wait for the photo to finish processing.');const name=$('editBranchName')?.value.trim(),branchName=$('editBranchSubtitle')?.value.trim()||'',status=$('editBranchStatus')?.value;let b=selected===null?null:branchData[selected];if(!name)return showModalError('Branch Name is required.');if(branchData.some((x,i)=>i!==selected&&x.name.toLowerCase()===name.toLowerCase()))return showModalError('Duplicate Branch Name.');if(b){let old=b.name;b.name=name;b.branchName=branchName;b.status=status;if(uploadedBranchPhoto)b.photo=uploadedBranchPhoto;b.photoX=branchPosition.x;b.photoY=branchPosition.y;b.photoZoom=branchPhotoZoom;people.forEach(p=>{if(p.branch===old)p.branch=name;if(Array.isArray(p.branches))p.branches=p.branches.map(x=>x===old?name:x)});log('Edit Branch',old+' → '+name+' ('+status+')')}else{branchData.push({name,branchName,status,photo:uploadedBranchPhoto||null,photoX:branchPosition.x,photoY:branchPosition.y,photoZoom:branchPhotoZoom});log('Add Branch',name)}uploadedBranchPhoto=null;branches=branchData.map(b=>b.name);closeModal();if(!persist())console.warn('Changes are visible in this session but this preview prevented permanent local storage.')}
+function saveBranchEditor(){if(branchPhotoLoading)return showModalError('Please wait for the photo to finish processing.');const name=$('editBranchName')?.value.trim(),branchName=$('editBranchSubtitle')?.value.trim()||'',status=$('editBranchStatus')?.value;let b=selected===null?null:branchData[selected];if(!name)return showModalError('Branch Name is required.');if(branchData.some((x,i)=>i!==selected&&x.name.toLowerCase()===name.toLowerCase()))return showModalError('Duplicate Branch Name.');if(b){let old=b.name;b.name=name;b.branchName=branchName;b.status=status;if(uploadedBranchPhoto)b.photo=uploadedBranchPhoto;b.photoX=branchPosition.x;b.photoY=branchPosition.y;b.photoZoom=branchPhotoZoom;people.forEach(p=>{if(p.branch===old)p.branch=name;if(Array.isArray(p.branches))p.branches=p.branches.map(x=>x===old?name:x)});log('Edit Branch',`Branch: ${old} → ${name}; Branch Name: ${branchName}; Status: ${status}; Photo settings updated`)}else{branchData.push({name,branchName,status,photo:uploadedBranchPhoto||null,photoX:branchPosition.x,photoY:branchPosition.y,photoZoom:branchPhotoZoom});log('Add Branch',name)}uploadedBranchPhoto=null;branches=branchData.map(b=>b.name);closeModal();if(!persist())console.warn('Changes are visible in this session but this preview prevented permanent local storage.')}
 function toggleBranchDirect(i){let b=branchData[i];if(!b)return;b.status=b.status==='Active'?'Inactive':'Active';log('Branch Status',b.name+' → '+b.status);render()}
 const previousModal=modalHTML;
 modalHTML=function(){if(!['branchEdit','resetpass','useredit'].includes(modal))return previousModal();let title={branchEdit:selected===null?'Add Branch':'Edit Branch',resetpass:'Reset Password',useredit:'Edit Login Account'}[modal];return `<div class="overlay" onclick="if(event.target===this && !['add','edit','ultranetEdit'].includes(modal))closeModal()"><div class="modal ${modal==='useredit'?'wide-modal':''}"><div class="toolbar" style="justify-content:space-between"><h2>${title}</h2><button class="btn ghost sm" onclick="closeModal()">✕</button></div>${modal==='branchEdit'?branchEditor():modal==='resetpass'?passwordResetForm():userEditForm()}</div></div>`};
@@ -1908,10 +1935,27 @@ function categorizedAccountForm(){
  const category=createAccountCategory;
  const chosen=byId(selectedLoginMemberId)||people.find(p=>p.status==='Active');
  return `<div class="user-category-modal-row"><button class="btn ${category==='Admin'?'':'secondary'}" onclick="switchNewAccountCategory('Admin')">Admin</button><button class="btn ${category==='Salesperson'?'':'secondary'}" onclick="switchNewAccountCategory('Salesperson')">Salesperson</button></div>
-${category==='Salesperson'?`<label>Salesperson (Team Management)</label><select id="accountPersonId" onchange="refreshCategorizedAccountSummary()" style="width:100%;max-width:none"><option value="">Select Member</option>${people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}" ${Number(chosen?.id)===Number(p.id)?'selected':''}>${esc(p.name)} — ${esc(p.role)}</option>`).join('')}</select><div id="categorizedLinkedSummary">${chosen?accountLinkedInfo(chosen):''}</div>`:`<div class="user-linked-details"><div><label>Admin Category</label><b>Existing administrator: admin</b></div></div><p class="muted">Additional administrator accounts require a dedicated administrator invitation process. No new administrator will be created from this form.</p>`}
+${category==='Salesperson'?`<label>Salesperson (Team Management)</label><select id="accountPersonId" onchange="refreshCategorizedAccountSummary()" style="width:100%;max-width:none"><option value="">Select Member</option>${people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}" ${Number(chosen?.id)===Number(p.id)?'selected':''}>${esc(p.name)} — ${esc(p.role)}</option>`).join('')}</select><div id="categorizedLinkedSummary">${chosen?accountLinkedInfo(chosen):''}</div>`:`<div class="admin-create-form"><div><label for="newAdminFullName">Full Name *</label><input id="newAdminFullName" placeholder="Enter full name" autocomplete="name"></div><div><label for="newAdminUserId">User ID *</label><input id="newAdminUserId" placeholder="Enter User ID" autocomplete="off"></div><div><label for="newAdminPassword">Password *</label><input id="newAdminPassword" type="password" placeholder="At least 10 characters" autocomplete="new-password"></div></div><p class="muted">New administrator accounts require the secure server-side account creation endpoint to be enabled. Your password will not be stored in the page or shared workspace.</p>`}
 ${category==='Salesperson'?`<label style="display:block;margin-top:14px">Login Password *</label><input type="password" id="categoryPassword" autocomplete="new-password" minlength="10" placeholder="Minimum 10 characters"><p class="user-category-note">Name, Branch, Role and User ID are linked automatically. Password is sent to Supabase Auth, never saved in workspace data. Staff sign-in and branch-specific access remain restricted until role-based access is completed.</p>`:''}
-<div class="actions" style="margin-top:20px">${category==='Salesperson'?'<button class="btn" id="categoryCreateButton" onclick="saveCategorizedAccount()">Create User</button>':''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
+<div class="actions" style="margin-top:20px">${category==='Salesperson'?'<button class="btn" id="categoryCreateButton" onclick="saveCategorizedAccount()">Create User</button>':'<button class="btn" id="categoryCreateButton" onclick="saveAdminAccount()">Create Admin</button>'}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
 }
+
+async function saveAdminAccount(){
+ const name=String(document.getElementById('newAdminFullName')?.value||'').trim();
+ const username=String(document.getElementById('newAdminUserId')?.value||'').trim().toLowerCase();
+ const password=String(document.getElementById('newAdminPassword')?.value||'');
+ if(!name)return showModalError('Full Name is required.');
+ if(!/^[a-z0-9][a-z0-9._-]{2,59}$/.test(username))return showModalError('User ID must be 3–60 letters, numbers, dots, dashes or underscores.');
+ if(password.length<10)return showModalError('Password must be at least 10 characters.');
+ const btn=document.getElementById('categoryCreateButton');if(btn)btn.disabled=true;
+ try{
+   await accountAdminRequest({action:'create_admin',full_name:name,username,password});
+   log('Create Admin',`Admin user ${username} created`);
+   modal='';accountCategory='Admin';await fetchAccountDirectory();render();
+ }catch(err){showModalError('Could not create Admin: '+(err?.message||'Account service unavailable')+'. The secure administrator creation service may not be enabled yet.');}
+ finally{if(btn&&btn.isConnected)btn.disabled=false;}
+}
+
 async function saveCategorizedAccount(){
  const id=Number($('accountPersonId')?.value),p=byId(id),password=$('categoryPassword')?.value||'',username=linkedUltranetId(id).toLowerCase();
  if(!p||p.status!=='Active')return showModalError('Select an active salesperson.');
@@ -1942,4 +1986,32 @@ const _gridBodyV65=gridBody;
 gridBody=function(kind){if(kind!=='activity')return _gridBodyV65(kind);return gridFiltered('activity').map(h=>`<tr><td>${esc(h.time)}</td><td>${esc(h.userId)}</td><td>${esc(h.module)}</td><td>${esc(h.action)}</td><td>${esc(h.detail)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No activity</td></tr>'};
 log=function(action,detail){const module=activityModuleFromEvent({action,detail});const userId=sessionUser==='admin'?'admin':String(byId(sessionUser)?.username||'Unknown');const entry={time:new Date().toLocaleString(),userId,actor:userId,module,action,detail};history.unshift(entry);notices.unshift({time:entry.time,action,detail,read:false});persist()};
 
+
+/* v66 hierarchy page scrolling, and detailed activity rendering */
+const v66RenderOriginal=render;
+render=function(){
+ document.body.classList.toggle('hierarchy-page-scroll',!!sessionUser&&page==='Team Management'&&view==='Hierarchy');
+ v66RenderOriginal();
+};
+function normalizeAuditAction(action){
+ const a=String(action||'').toLowerCase();
+ if(/\b(delete|remove)\b/.test(a))return 'Delete';
+ if(/\b(add|create|import)\b/.test(a))return 'Add';
+ if(/\b(edit|update|change|transfer|reset|rename|status|inactive|reactivate|disable|enable|archive|save|permissions)\b/.test(a))return 'Edit';
+ if(/\b(export|download)\b/.test(a))return 'Export';
+ if(/\b(login|logout|sign in|sign out)\b/.test(a))return 'Login / Logout';
+ return action||'Other';
+}
+// For existing and future records, present action verb separately from specific event.
+const v66ActivityRows=gridRows;
+gridRows=function(kind){
+ const rows=v66ActivityRows(kind);
+ if(kind!=='activity')return rows;
+ return rows.map(row=>({...row,action:normalizeAuditAction(row.action),detail:String(row.detail||'')+(row.action&&normalizeAuditAction(row.action)!==row.action?' · '+row.action:'')}));
+};
+const v66AuditGridBody=gridBody;
+gridBody=function(kind){
+ if(kind!=='activity')return v66AuditGridBody(kind);
+ return gridFiltered('activity').map(h=>{const a=String(h.action||'Other');const cls=/^(Add|Edit|Delete)$/.test(a)?a.toLowerCase():'';return `<tr><td>${esc(h.time)}</td><td>${esc(h.userId)}</td><td>${esc(h.module)}</td><td><span class="activity-action-badge ${cls}">${esc(a)}</span></td><td>${esc(h.detail)}</td></tr>`}).join('')||'<tr><td colspan="5" class="empty">No activity</td></tr>';
+};
 </script></body></html>
