@@ -919,6 +919,26 @@ html.hierarchy-document-scroll body .hier-team,
 html.hierarchy-document-scroll body .chart-scroll{width:max-content!important}
 html.hierarchy-document-scroll body .hier-horizontal-bar{display:none!important}
 
+
+/* v68: the hierarchy has one document-level horizontal scrollbar; keep the navigation
+   fixed to the left edge while the wide chart scrolls underneath the document. */
+@media (min-width:701px){
+ html.hierarchy-document-scroll body .app{padding-left:245px!important}
+ html.hierarchy-document-scroll body .side{
+   position:fixed!important;top:0!important;left:0!important;bottom:auto!important;
+   width:245px!important;height:100vh!important;z-index:35!important;
+   flex-shrink:0!important;
+ }
+ html.hierarchy-document-scroll body .main{flex:none!important}
+}
+@media (min-width:701px) and (max-width:900px){
+ html.hierarchy-document-scroll body .app{padding-left:72px!important}
+ html.hierarchy-document-scroll body .side{width:72px!important}
+}
+@media (max-width:700px){
+ /* Mobile keeps its existing fixed bottom navigation, not a horizontally moving sidebar. */
+ html.hierarchy-document-scroll body .side{position:fixed!important}
+}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1944,16 +1964,30 @@ userManagement=function(){return `<div class="toolbar" style="justify-content:sp
 <div class="user-category-tabs"><button class="${accountCategory==='Admin'?'active':''}" onclick="selectUserCategory('Admin')">Admin</button><button class="${accountCategory==='Salesperson'?'active':''}" onclick="selectUserCategory('Salesperson')">Salesperson</button></div>
 <input class="user-directory-search" type="search" placeholder="Search" aria-label="Search User ID and Role" value="${esc(accountDirectoryQuery)}" oninput="searchUserDirectory(this.value)">
 <div class="tablewrap"><table><thead><tr><th>Full Name</th><th>User ID</th><th>Role</th><th>Branch</th><th>Account Status</th><th>Details</th></tr></thead><tbody id="user-directory-rows">${userDirectoryRows()}</tbody></table></div>`};
-function openCategorizedAccountCreate(){createAccountCategory='Salesperson';selectedLoginMemberId=null;modal='categorizedAccount';render();}
+function openCategorizedAccountCreate(){createAccountCategory='Admin';selectedLoginMemberId=null;modal='categorizedAccount';render();}
 function switchNewAccountCategory(category){createAccountCategory=category;selectedLoginMemberId=null;render()}
 function newAccountMemberPicker(){return people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}">${esc(p.name)} · ${esc(linkedUltranetId(p.id)||'No Ultranet User ID')} · ${esc(p.role)}</option>`).join('')}
+function filterNewAccountSalespeople(query){
+ const select=document.getElementById('accountPersonId');
+ if(!select)return;
+ const kw=String(query||'').trim().toLowerCase();
+ const matches=people.filter(p=>p.status==='Active'&&[
+  p.name,p.ic,p.role,linkedUltranetId(p.id),memberBranchText(p)
+ ].some(value=>String(value||'').toLowerCase().includes(kw)));
+ const current=String(select.value||'');
+ select.innerHTML='<option value="">'+(matches.length?'Select Member':'No matching salespeople')+'</option>'+matches.map(p=>'<option value="'+Number(p.id)+'">'+esc(p.name)+' — '+esc(p.role)+' — '+esc(linkedUltranetId(p.id)||'No User ID')+'</option>').join('');
+ if(matches.some(p=>String(p.id)===current))select.value=current;
+ else{select.value='';selectedLoginMemberId=null;}
+ const summary=document.getElementById('categorizedLinkedSummary');
+ if(summary)summary.textContent=matches.length?'Select a Team Management member.':'No matching salespeople.';
+}
 function refreshCategorizedAccountSummary(){const select=$('accountPersonId'),id=Number(select?.value),p=byId(id);selectedLoginMemberId=p?.id||null;const box=$('categorizedLinkedSummary');if(box)box.innerHTML=p?accountLinkedInfo(p):'Select a Team Management member.';}
 function accountLinkedInfo(p){const id=linkedUltranetId(p.id);const exists=adminAccountDirectory.find(x=>x.category==='Salesperson'&&Number(x.member_id)===Number(p.id));return `<div class="user-linked-details"><div><label>Full Name</label><b>${esc(p.name)}</b></div><div><label>User ID (Ultranet)</label><b>${esc(id||'Not assigned')}</b></div><div><label>Role</label>${salesRoleBadge(p.role)}</div><div><label>Branch</label><b>${esc(memberBranchText(p))}</b></div></div>${!id?'<p class="muted">Set the Ultranet User ID before creating a login.</p>':''}${exists?'<p class="muted">This member already has an account. Use Manage to reset the password.</p>':''}`}
 function categorizedAccountForm(){
  const category=createAccountCategory;
  const chosen=byId(selectedLoginMemberId)||people.find(p=>p.status==='Active');
  return `<div class="user-category-modal-row"><button class="btn ${category==='Admin'?'':'secondary'}" onclick="switchNewAccountCategory('Admin')">Admin</button><button class="btn ${category==='Salesperson'?'':'secondary'}" onclick="switchNewAccountCategory('Salesperson')">Salesperson</button></div>
-${category==='Salesperson'?`<label>Salesperson (Team Management)</label><select id="accountPersonId" onchange="refreshCategorizedAccountSummary()" style="width:100%;max-width:none"><option value="">Select Member</option>${people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}" ${Number(chosen?.id)===Number(p.id)?'selected':''}>${esc(p.name)} — ${esc(p.role)}</option>`).join('')}</select><div id="categorizedLinkedSummary">${chosen?accountLinkedInfo(chosen):''}</div>`:`<div class="admin-create-form"><div><label for="newAdminFullName">Full Name *</label><input id="newAdminFullName" placeholder="Enter full name" autocomplete="name"></div><div><label for="newAdminUserId">User ID *</label><input id="newAdminUserId" placeholder="Enter User ID" autocomplete="off"></div><div><label for="newAdminPassword">Password *</label><input id="newAdminPassword" type="password" placeholder="At least 10 characters" autocomplete="new-password"></div></div><p class="muted">New administrator accounts require the secure server-side account creation endpoint to be enabled. Your password will not be stored in the page or shared workspace.</p>`}
+${category==='Salesperson'?`<label for="accountPersonSearch">Salesperson (Team Management)</label><input id="accountPersonSearch" type="search" placeholder="Search by name, IC No., User ID, role or branch" autocomplete="off" oninput="filterNewAccountSalespeople(this.value)" style="width:100%;margin:7px 0 10px"><select id="accountPersonId" onchange="refreshCategorizedAccountSummary()" style="width:100%;max-width:none"><option value="">Select Member</option>${people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}" ${Number(selectedLoginMemberId)===Number(p.id)?'selected':''}>${esc(p.name)} — ${esc(p.role)}</option>`).join('')}</select><div id="categorizedLinkedSummary">${selectedLoginMemberId&&chosen?accountLinkedInfo(chosen):'Select a Team Management member.'}</div>`:`<div class="admin-create-form"><div><label for="newAdminFullName">Full Name *</label><input id="newAdminFullName" placeholder="Enter full name" autocomplete="name"></div><div><label for="newAdminUserId">User ID *</label><input id="newAdminUserId" placeholder="Enter User ID" autocomplete="off"></div><div><label for="newAdminPassword">Password *</label><input id="newAdminPassword" type="password" placeholder="At least 10 characters" autocomplete="new-password"></div></div><p class="muted">New administrator accounts require the secure server-side account creation endpoint to be enabled. Your password will not be stored in the page or shared workspace.</p>`}
 ${category==='Salesperson'?`<label style="display:block;margin-top:14px">Login Password *</label><input type="password" id="categoryPassword" autocomplete="new-password" minlength="10" placeholder="Minimum 10 characters"><p class="user-category-note">Name, Branch, Role and User ID are linked automatically. Password is sent to Supabase Auth, never saved in workspace data. Staff sign-in and branch-specific access remain restricted until role-based access is completed.</p>`:''}
 <div class="actions" style="margin-top:20px">${category==='Salesperson'?'<button class="btn" id="categoryCreateButton" onclick="saveCategorizedAccount()">Create User</button>':'<button class="btn" id="categoryCreateButton" onclick="saveAdminAccount()">Create Admin</button>'}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
 }
