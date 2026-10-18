@@ -823,6 +823,21 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 @media(max-width:540px){.dashboard-overview{gap:12px}.dashboard-kpi-stack{gap:10px}.dashboard-kpi{min-height:137px;padding:15px!important}.dashboard-kpi .stat-heading small{font-size:12px}.dashboard-kpi b{font-size:30px}.dashboard-team-card{padding:17px!important}.dashboard-chart-layout{gap:10px}.dashboard-chart-legend{gap:12px}.dashboard-chart-label b{font-size:11px}.dashboard-chart-label small{font-size:10px}.dashboard-chart-legend-row>strong{font-size:16px}.branch-gallery{grid-template-columns:1fr!important}.branch-gallery .branch-cover{height:205px!important}}
 @media(prefers-reduced-motion:reduce){.dashboard-team-card,.team-donut-segment{transition:none!important}}
 
+
+/* v58: five balanced KPI cards and four branch photo cards per desktop row */
+.dashboard-five-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:28px}
+.dashboard-five-kpis .dashboard-kpi{min-width:0;min-height:172px;padding:19px!important;gap:11px;transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s,border-color .3s}
+.dashboard-five-kpis .dashboard-kpi .stat-heading{gap:8px;align-items:flex-start}
+.dashboard-five-kpis .dashboard-kpi .stat-heading small{font-size:12px;line-height:1.35}
+.dashboard-five-kpis .dashboard-kpi b{font-size:clamp(30px,3vw,45px);margin:6px 0 0}
+.dashboard-five-kpis .dashboard-kpi>small{font-size:11px;line-height:1.4}
+.dashboard-kpi-managers{--stat-gradient:linear-gradient(130deg,#7860d9,#c9c1fa);--stat-accent:#8977dc}
+.dashboard-kpi-leaders{--stat-gradient:linear-gradient(130deg,#149b9a,#9be7dd);--stat-accent:#20a99e}
+.dashboard-kpi-advisors{--stat-gradient:linear-gradient(130deg,#e19b40,#ffdeb1);--stat-accent:#dfa04b}
+@media(max-width:1260px){.dashboard-five-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:780px){.dashboard-five-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}}
+@media(max-width:440px){.dashboard-five-kpis .dashboard-kpi{min-height:140px;padding:12px!important}.dashboard-five-kpis .dashboard-kpi .stat-heading small{font-size:11px}.dashboard-five-kpis .dashboard-kpi b{font-size:29px}.dashboard-five-kpis .dashboard-kpi>small{font-size:10px}}
+
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -913,29 +928,15 @@ function memberFormError(message){let x=document.getElementById('member-save-err
 function dashboard(){
  const list=visible().filter(p=>p.status==='Active');
  const count=r=>list.filter(p=>p.role===r).length;
- const totals=[count('Manager'),count('Leader'),count('Member')];
- const all=totals.reduce((a,b)=>a+b,0);
- const rings=[{name:'Sales Managers',value:totals[0],color:'#8b79e4'},{name:'Team Leaders',value:totals[1],color:'#29b4a6'},{name:'Sales Advisors',value:totals[2],color:'#e9a34f'}];
- const circumference=2*Math.PI*68;
- let offset=0;
- const donut=rings.map(item=>{
-   const length=all?item.value/all*circumference:0;
-   const circle=`<circle class="team-donut-segment" cx="105" cy="105" r="68" fill="none" stroke="${item.color}" stroke-width="25" stroke-dasharray="${length.toFixed(4)} ${circumference.toFixed(4)}" stroke-dashoffset="${(-offset).toFixed(4)}" transform="rotate(-90 105 105)"><title>${item.name}: ${item.value} (${all?Math.round(item.value/all*100):0}%)</title></circle>`;
-   offset+=length;return circle;
- }).join('');
  const activeBranches=branchData.filter(b=>b.status==='Active').length;
- return `<section class="dashboard-overview" aria-label="Sales organization overview">
-   <div class="dashboard-kpi-stack">
-     <div class="card stat dashboard-kpi dashboard-kpi-branches"><div class="stat-heading"><small>Total Branches</small><span class="stat-icon" aria-hidden="true">⌂</span></div><b>${activeBranches}</b><small>Active branches</small></div>
-     <div class="card stat dashboard-kpi dashboard-kpi-members"><div class="stat-heading"><small>Total Active Members</small><span class="stat-icon" aria-hidden="true">◈</span></div><b>${list.length}</b><small>Unique active team members</small></div>
-   </div>
-   <div class="card dashboard-team-card">
-     <div class="dashboard-team-heading"><div><h2>Team Breakdown</h2><p>Active members by role</p></div><span class="dashboard-team-count">${list.length} active</span></div>
-     <div class="dashboard-chart-layout"><div class="dashboard-chart-graphic"><svg class="team-donut-svg" viewBox="0 0 210 210" role="img" aria-label="${totals[0]} Sales Managers, ${totals[1]} Team Leaders, ${totals[2]} Sales Advisors"><circle cx="105" cy="105" r="68" fill="none" stroke="var(--donut-track,#eef0f6)" stroke-width="25"/>${donut}<text x="105" y="102" text-anchor="middle" class="team-donut-number">${list.length}</text><text x="105" y="124" text-anchor="middle" class="team-donut-caption">Active</text></svg></div>
-       <div class="dashboard-chart-legend">${rings.map(item=>`<div class="dashboard-chart-legend-row"><span class="dashboard-chart-bullet" style="background:${item.color}"></span><div class="dashboard-chart-label"><b>${item.name}</b><small>${all?Math.round(item.value/all*100):0}% of team</small></div><strong>${item.value}</strong></div>`).join('')}</div>
-     </div>
-   </div>
- </section>
+ const kpis=[
+   {label:'Total Branches',value:activeBranches,note:'Active branches',kind:'branches',icon:'⌂'},
+   {label:'Total Active Members',value:list.length,note:'Unique active members',kind:'members',icon:'◈'},
+   {label:'Sales Managers',value:count('Manager'),note:'Active managers',kind:'managers',icon:'♙'},
+   {label:'Team Leaders',value:count('Leader'),note:'Active leaders',kind:'leaders',icon:'◇'},
+   {label:'Sales Advisors',value:count('Member'),note:'Active advisors',kind:'advisors',icon:'♧'}
+ ];
+ return `<section class="dashboard-five-kpis" aria-label="Sales organization key statistics">${kpis.map(item=>`<div class="card stat dashboard-kpi dashboard-kpi-${item.kind}"><div class="stat-heading"><small>${item.label}</small><span class="stat-icon" aria-hidden="true">${item.icon}</span></div><b>${item.value}</b><small>${item.note}</small></div>`).join('')}</section>
  <div class="dashboard-branch-heading"><h2>Our Branches</h2><span>${activeBranches} ${activeBranches===1?'branch':'branches'}</span></div>
  <div class="branch-gallery">${branchData.map(b=>{
  const branchActive=list.filter(p=>memberInBranch(p,b.name)),ms=branchActive.filter(p=>p.role==='Manager'),leaderCount=branchActive.filter(p=>p.role==='Leader').length,advisorCount=branchActive.filter(p=>p.role==='Member').length,totalBranch=ms.length+leaderCount+advisorCount;
