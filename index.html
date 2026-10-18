@@ -856,6 +856,8 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 
 
 .user-admin-search{margin:0 0 14px;max-width:390px}.user-admin-search input{width:100%;max-width:none}
+
+.ultra-secret-cell{display:flex;align-items:center;gap:8px;white-space:nowrap}.ultra-secret-cell>span{max-width:200px;overflow:hidden;text-overflow:ellipsis}.ultra-secret-entry{display:flex;gap:8px;align-items:center}.ultra-secret-entry input{flex:1;min-width:0}.ultra-secret-form{grid-column:1/-1}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1226,7 +1228,7 @@ async function login(){
     salesAuthExpiresAt=Date.now()+Math.max(30,Number(signedIn.expires_in||3600))*1000;
     saveSalesSession();
     try { await loadCloudWorkspace(); } catch(loadError) {salesAuthAccessToken=null; salesAuthRefreshToken=null; clearSalesSession(); throw new Error('Workspace could not load: '+loadError.message);}
-    sessionUser='admin';role='Admin';actor=0;restoreSalesView();startCloudPolling();
+    sessionUser='admin';role='Admin';actor=0;await refreshUltranetPermission();restoreSalesView();startCloudPolling();
     loginEvents.unshift({username:'admin',event:'Login',time:new Date().toLocaleString(),result:'Success'});
     persist();render();
   } catch(err){
@@ -1329,7 +1331,7 @@ permissionEditor=function(perms){return `<div class="tablewrap"><table class="pe
 // Ultranet is a separate directory of credentials linked to Member profiles.
 let ultranetRecords=[];let ultranetBranch='All', ultranetTerm='', ultranetStatus='Active', ultranetRole='All', ultranetFilter={}, ultranetSort={key:'name',direction:1},ultranetEditing=null;
 const isSuperadmin=()=>sessionUser==='admin';
-const canViewUltranetPassword=()=>isSuperadmin()||(hasModule('Ultranet')&&(byId(sessionUser)?.permissions||defaultPerms(role)).Ultranet?.includes('View Password')===true);
+let canViewUltranetPassword=()=>Boolean(ultranetServerPermission && salesAuthAccessToken);
 function ulAllowed(a){return isSuperadmin()||canAction('Ultranet',a)}
 function ultranetValue(x,key){return String(key==='branch'?memberBranchText(x.member):key==='name'?x.member.name:key==='role'?({Manager:'Sales Manager',Leader:'Sales Team Leader',Member:'Sales Advisor'}[x.member.role]||x.member.role):key==='status'?x.member.status:key==='password'?x.record?.password||'':x.record?.userId||'')}
 function ultranetData(){
@@ -1356,7 +1358,7 @@ function ultranetData(){
 function ultranet(){
  const branchesForTabs=['All',...branches],rows=ultranetData();
  const cols=[['branch','Branch'],['name','Full Name'],['role','Role'],['status','Status'],['userId','User ID'],...(canViewUltranetPassword()?[['password','Password']]:[])];
- return `<div class="card"><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select></div>${canViewUltranetPassword()?`<p class="ultranet-password-info">Password column is visible to authorized administrators. Existing plaintext passwords are not available; secure credential management has not yet been configured.</p>`:''}<div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
+ return `<div class="card"><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select></div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
 }
 function ultranetRowsHTML(rows){
  let previousGroup='';
@@ -1368,7 +1370,7 @@ function ultranetRowsHTML(rows){
   const separator=isGroupStart?`<tr class="team-group-divider ${group.leaderId?'team-group-leader':'team-group-manager'}"><td colspan="${count}"><span class="group-label">${groupLabel}</span></td></tr>`:'';
   const rc=m.role==='Manager'?'ultra-manager-row':m.role==='Leader'?'ultra-leader-row':'';
   const canOpen=ulAllowed('Edit')||ulAllowed('Add');
-  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td>${esc(x.record?.userId||'—')}</td>${canViewUltranetPassword()?`<td><span class="ultranet-password-unavailable" title="Passwords are not stored in this app. Configure a separate secure credential service to enable viewing.">Not configured</span></td>`:''}</tr>`;
+  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td>${esc(x.record?.userId||'—')}</td>${canViewUltranetPassword()?`<td><div class="ultra-secret-cell"><span id="ultra-secret-${m.id}">${ultranetPasswordIds.has(Number(m.id))?'••••••••':'—'}</span><button class="btn ghost sm" type="button" onclick="event.stopPropagation();revealUltranetPassword(${m.id})" aria-label="Reveal Ultranet password">◉</button></div></td>`:''}</tr>`;
  }).join('')||`<tr><td colspan="${count}" class="empty">No matching members</td></tr>`;
 }
 
@@ -1458,7 +1460,7 @@ render=function(){
  if(role!=='Admin'){const bar=document.querySelector('header.top .toolbar');if(bar){const count=notices.filter(n=>!n.read).length;const b=document.createElement('button');b.className='btn ghost sm';b.textContent='♧ Notifications'+(count?' ('+count+')':'');b.onclick=toggleNotifications;bar.appendChild(b);}}
 };
 const _ultranetEditV29=ultranetEditForm;
-ultranetEditForm=function(){let p=byId(selected);const r=ultranetRecords.find(x=>x.memberId===selected);return `<div class="formgrid"><div><label>Full Name (Team Management)</label><div class="ultranet-linked-field">${esc(p?.name||'')}</div></div><div><label>Branch (Team Management)</label><div class="ultranet-linked-field">${esc(memberBranchText(p))}</div></div><div><label>Role (Team Management)</label><div class="ultranet-linked-field">${esc(p?.role||'')}</div></div><div><label>Status (Team Management)</label><div class="ultranet-linked-field">${esc(p?.status||'')}</div></div><div><label>User ID</label><input id="ultraID" value="${esc(r?.userId||'')}"></div>${canViewUltranetPassword()?`<div><label>Password</label><div class="ultranet-linked-field" title="Ultranet credentials require secure storage before they can be displayed or updated">Not configured — secure credential service required</div></div>`:''}</div><div class="account-scope-hint">Branch / Role are linked from Team Management. Changes there update Ultranet automatically.</div><div class="actions"><button class="btn" onclick="saveUltranetRecord()">Save</button>${r&&ulAllowed('Delete')?`<button class="btn danger" onclick="deleteUltranetRecord()">Delete Ultranet Entry</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`};
+ultranetEditForm=function(){let p=byId(selected);const r=ultranetRecords.find(x=>x.memberId===selected);return `<div class="formgrid"><div><label>Full Name (Team Management)</label><div class="ultranet-linked-field">${esc(p?.name||'')}</div></div><div><label>Branch (Team Management)</label><div class="ultranet-linked-field">${esc(memberBranchText(p))}</div></div><div><label>Role (Team Management)</label><div class="ultranet-linked-field">${esc(p?.role||'')}</div></div><div><label>Status (Team Management)</label><div class="ultranet-linked-field">${esc(p?.status||'')}</div></div><div><label>User ID</label><input id="ultraID" value="${esc(r?.userId||'')}"></div>${canViewUltranetPassword()?`<div class="ultra-secret-form"><label for="ultraPW">Ultranet Password</label><div class="ultra-secret-entry"><input id="ultraPW" type="password" autocomplete="new-password" placeholder="Enter new password to change it" maxlength="512"><button type="button" class="btn ghost sm" onclick="toggleUltranetNewPassword()" aria-label="Show or hide password">Show</button></div><div class="muted" style="margin-top:6px">Leave blank to keep the existing password. Visible only with View Password permission.</div><button type="button" class="btn ghost sm" style="margin-top:8px" onclick="loadUltranetPasswordIntoEdit()">View existing password</button><button type="button" class="btn ghost sm" style="margin-top:8px" onclick="copyExistingUltranetPassword()">Copy password</button></div>`:''}</div><div class="account-scope-hint">Branch / Role are linked from Team Management. Changes there update Ultranet automatically.</div><div class="actions"><button class="btn" onclick="saveUltranetRecord()">Save</button>${r&&ulAllowed('Delete')?`<button class="btn danger" onclick="deleteUltranetRecord()">Delete Ultranet Entry</button>`:''}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`};
 // Preview-only cross-tab realtime: common browser origin + BroadcastChannel, no cross-device server.
 let syncChannel=null;
 try{if(typeof BroadcastChannel!=='undefined'){syncChannel=new BroadcastChannel('sales-team-clean-v40');syncChannel.onmessage=e=>{if(!e.data||e.data.type!=='system-update')return;const snapshot=e.data.snapshot;if(!snapshot)return;people=snapshot.people;branchData=snapshot.branchData;branches=branchData.map(x=>x.name);history=snapshot.history;notices=snapshot.notices;ultranetRecords=snapshot.ultranetRecords;render();};}}catch(e){console.warn('Preview cross-tab sync not available',e)}
@@ -1584,7 +1586,7 @@ function rememberSalesView(){try{localStorage.setItem(SALES_VIEW_KEY,JSON.string
 function clearSalesView(){try{localStorage.removeItem(SALES_VIEW_KEY)}catch(e){}}
 function restoreSalesView(){try{const p=JSON.parse(localStorage.getItem(SALES_VIEW_KEY)||'null');if(!p)return;const allowed=['Dashboard','Team Management','Ultranet','Activity History','Administration'];if(allowed.includes(p.page)&&hasModule(p.page))page=p.page;if(['User Management','Role Setup','Branch Setup','Login History'].includes(p.adminTab))adminTab=p.adminTab;if(['Light','Starlight'].includes(p.theme))theme=p.theme;if(['List','Hierarchy'].includes(p.view))view=p.view;if(typeof p.branchFilter==='string'&&(p.branchFilter==='All'||branches.includes(p.branchFilter)))branchFilter=p.branchFilter;if(['Active','Inactive','All'].includes(p.statusFilter))statusFilter=p.statusFilter;if(['All','Manager','Leader','Member'].includes(p.roleFilter))roleFilter=p.roleFilter;}catch(e){console.warn('Could not restore view:',e)}}
 async function renewSalesSession(){if(salesRefreshPromise)return salesRefreshPromise;if(!salesAuthRefreshToken)throw new Error('Session expired. Please sign in again.');salesRefreshPromise=(async()=>{const renewed=await salesAuthCall('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:salesAuthRefreshToken})});if(!renewed.access_token)throw new Error('Session renewal failed.');salesAuthAccessToken=renewed.access_token;salesAuthRefreshToken=renewed.refresh_token||salesAuthRefreshToken;salesAuthExpiresAt=Date.now()+Math.max(30,Number(renewed.expires_in||3600))*1000;saveSalesSession();return renewed;})();try{return await salesRefreshPromise}finally{salesRefreshPromise=null}}
-async function restoreSalesSession(){let stored;try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){return}if(!stored?.refresh_token)return;salesAuthRefreshToken=stored.refresh_token;salesAuthAccessToken=stored.access_token||null;salesAuthExpiresAt=Number(stored.expires_at||0);try{if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();const response=await cloudRequest('/rest/v1/user_profiles?select=id,username,enabled&username=eq.admin');if(!Array.isArray(response)||response.length!==1||response[0].enabled!==true)throw Error('Administrator access disabled');await loadCloudWorkspace();sessionUser='admin';role='Admin';actor=0;restoreSalesView();startCloudPolling();render();}catch(e){console.warn('Unable to restore authenticated session:',e);if(/fetch|network|connection/i.test(String(e.message||e))){showRestoringShell('Connection unavailable. Your page is preserved.','Retry connection');}else{salesAuthAccessToken=null;salesAuthRefreshToken=null;clearSalesSession();render();} }}
+async function restoreSalesSession(){let stored;try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){return}if(!stored?.refresh_token)return;salesAuthRefreshToken=stored.refresh_token;salesAuthAccessToken=stored.access_token||null;salesAuthExpiresAt=Number(stored.expires_at||0);try{if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();const response=await cloudRequest('/rest/v1/user_profiles?select=id,username,enabled&username=eq.admin');if(!Array.isArray(response)||response.length!==1||response[0].enabled!==true)throw Error('Administrator access disabled');await loadCloudWorkspace();sessionUser='admin';role='Admin';actor=0;await refreshUltranetPermission();restoreSalesView();startCloudPolling();render();}catch(e){console.warn('Unable to restore authenticated session:',e);if(/fetch|network|connection/i.test(String(e.message||e))){showRestoringShell('Connection unavailable. Your page is preserved.','Retry connection');}else{salesAuthAccessToken=null;salesAuthRefreshToken=null;clearSalesSession();render();} }}
 let cloudVersion=0, cloudReady=false, cloudDirty=false, cloudSaving=false, cloudSaveTimer=null, cloudStatusMessage='';
 let cloudActivityTimer=null;
 const salesCloudNotice=document.createElement('style');
@@ -1747,5 +1749,92 @@ deleteSetupRole=function(name){if(name==='Superadmin')return roleMessage('Supera
 const _saveRoleSetupV62=saveRoleSetup;
 saveRoleSetup=function(){if(roleSetupSelected==='Superadmin')return roleMessage('Superadmin always has all permissions.');return _saveRoleSetupV62()};
 ensureSuperadminRole();
+
+
+/* v63: Authenticated Ultranet vault. Passwords never enter workspace_state/localStorage. */
+let ultranetServerPermission=false;
+let ultranetPasswordIds=new Set();
+let ultranetRevealTimeouts=new Map();
+async function refreshUltranetPermission(){
+ ultranetServerPermission=false;
+ ultranetPasswordIds.clear();
+ if(!salesAuthAccessToken)return;
+ try {
+  const allowed=await cloudRequest('/rest/v1/rpc/ultranet_password_allowed',{method:'POST',body:'{}'});
+  ultranetServerPermission=allowed===true;
+  if(ultranetServerPermission){
+   const ids=await cloudRequest('/rest/v1/rpc/ultranet_password_present_ids',{method:'POST',body:'{}'});
+   if(Array.isArray(ids))ultranetPasswordIds=new Set(ids.map(x=>Number(x.member_id)));
+  }
+ }catch(err){console.warn('Could not verify Ultranet permission:',err);ultranetServerPermission=false;ultranetPasswordIds.clear()}
+}
+function toggleUltranetNewPassword(){
+ const input=document.getElementById('ultraPW');if(!input)return;
+ const showing=input.type==='password';input.type=showing?'text':'password';
+ const btn=input.nextElementSibling;if(btn)btn.textContent=showing?'Hide':'Show';
+}
+async function getUltranetSecret(memberId){
+ if(!canViewUltranetPassword())throw Error('View Password permission required.');
+ return await cloudRequest('/rest/v1/rpc/ultranet_password_read',{method:'POST',body:JSON.stringify({p_member_id:Number(memberId)})});
+}
+async function revealUltranetPassword(memberId){
+ const el=document.getElementById('ultra-secret-'+memberId);
+ if(!el)return;
+ if(el.dataset.visible==='yes'){
+  el.textContent=ultranetPasswordIds.has(Number(memberId))?'••••••••':'—';el.dataset.visible='no';
+  clearTimeout(ultranetRevealTimeouts.get(memberId));return;
+ }
+ el.textContent='Loading…';
+ try{
+  const value=await getUltranetSecret(memberId);
+  if(!el.isConnected)return;
+  el.textContent=value||'Not set';el.dataset.visible='yes';
+  clearTimeout(ultranetRevealTimeouts.get(memberId));
+  ultranetRevealTimeouts.set(memberId,setTimeout(()=>{if(el.isConnected){el.textContent=ultranetPasswordIds.has(Number(memberId))?'••••••••':'—';el.dataset.visible='no'}},15000));
+ }catch(err){if(el.isConnected)el.textContent='Unable to view';alert(err.message)}
+}
+async function loadUltranetPasswordIntoEdit(){
+ try {const val=await getUltranetSecret(selected);const el=document.getElementById('ultraPW');if(el){el.value=val||'';el.type='password';}if(!val)alert('No password has been saved yet.');}
+ catch(err){showModalError(err.message)}
+}
+async function copyExistingUltranetPassword(){
+ try{const val=await getUltranetSecret(selected);if(!val)return alert('No password has been saved yet.');await navigator.clipboard.writeText(val);notify('Password copied.');}
+ catch(err){showModalError(err.message)}
+}
+// Authorized viewer can save a password; everyone else can still edit the Ultranet User ID when allowed.
+saveUltranetRecord=async function(){
+ if(!ulAllowed('Edit')&&!ulAllowed('Add'))return showModalError('Ultranet edit permission required.');
+ const member=byId(selected);if(!member)return showModalError('Linked member not found.');
+ const id=String(document.getElementById('ultraID')?.value||'').trim();
+ if(!id)return showModalError('User ID is required.');
+ if(ultranetRecords.some(x=>x.memberId!==selected&&String(x.userId||'').trim().toLowerCase()===id.toLowerCase()))return showModalError('User ID already exists.');
+ const pwInput=document.getElementById('ultraPW');const newPassword=pwInput?.value||'';
+ const saveButton=pwInput?.closest('.modal')?.querySelector('.actions .btn');if(saveButton)saveButton.disabled=true;
+ try{
+  if(newPassword){
+   if(!canViewUltranetPassword())throw Error('View Password permission required.');
+   await cloudRequest('/rest/v1/rpc/ultranet_password_write',{method:'POST',body:JSON.stringify({p_member_id:Number(selected),p_password:newPassword})});
+   ultranetPasswordIds.add(Number(selected));
+  }
+  let record=ultranetRecords.find(x=>x.memberId===selected);
+  if(!record){record={memberId:selected,userId:id};ultranetRecords.push(record)}else{record.userId=id;delete record.password;}
+  if(pwInput)pwInput.value='';
+  log('Ultranet',member.name+' Ultranet details saved');
+  closeModal();
+ }catch(err){showModalError('Could not save Ultranet: '+err.message)}
+ finally{if(saveButton&&saveButton.isConnected)saveButton.disabled=false}
+};
+const v63RoleSave=saveRoleSetup;
+saveRoleSetup=async function(){
+ if(roleSetupSelected==='Superadmin')return v63RoleSave();
+ const perms=readPermissions();
+ const allowed=(perms.Ultranet||[]).includes('View Password');
+ try{await cloudRequest('/rest/v1/rpc/ultranet_role_password_permission',{method:'POST',body:JSON.stringify({p_role_name:roleSetupSelected,p_allow:allowed})});}
+ catch(err){return roleMessage('Password permission could not be saved: '+err.message)}
+ v63RoleSave();
+ await refreshUltranetPermission();
+};
+const v63Logout=logout;
+logout=async function(){for(const t of ultranetRevealTimeouts.values())clearTimeout(t);ultranetRevealTimeouts.clear();ultranetServerPermission=false;ultranetPasswordIds.clear();return v63Logout()};
 
 </script></body></html>
