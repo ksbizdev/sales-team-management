@@ -946,7 +946,9 @@ async function login(){
       throw new Error('Administrator profile is not linked or is disabled.');
     }
     salesAuthAccessToken=signedIn.access_token;
-    sessionUser='admin';role='Admin';actor=0;page='Dashboard';
+    salesAuthRefreshToken=signedIn.refresh_token||null;
+    try { await loadCloudWorkspace(); } catch(loadError) {salesAuthAccessToken=null; salesAuthRefreshToken=null; throw new Error('Workspace could not load: '+loadError.message);}
+    sessionUser='admin';role='Admin';actor=0;page='Dashboard';startCloudPolling();
     loginEvents.unshift({username:'admin',event:'Login',time:new Date().toLocaleString(),result:'Success'});
     persist();render();
   } catch(err){
@@ -955,7 +957,9 @@ async function login(){
   } finally {if(btn)btn.disabled=false;}
 }
 async function logout(){
- const token=salesAuthAccessToken;salesAuthAccessToken=null;
+ try{await flushCloudWorkspace()}catch(e){console.error(e);alert('Workspace changes could not be saved: '+e.message+'\nLogout canceled.');return;}
+ stopCloudPolling();
+ const token=salesAuthAccessToken;salesAuthAccessToken=null;salesAuthRefreshToken=null;
  if(token)await salesAuthCall('/auth/v1/logout',{method:'POST',headers:{Authorization:'Bearer '+token}}).catch(()=>{});
  loginEvents.unshift({username:'admin',event:'Logout',time:new Date().toLocaleString(),result:'Success'});
  persist();sessionUser=null;modal='';render();
@@ -1187,7 +1191,7 @@ function loadRoleTemplates(){
  try{const saved=JSON.parse(localStorage.getItem(roleSetupKey)||'null');if(saved&&typeof saved==='object'){roleTemplates=saved;roleSetupNames=[...new Set([...roleSetupNames,...Object.keys(saved)])];}}catch(err){console.warn('Role templates unavailable',err)}
  for(const n of roleSetupNames){if(!roleTemplates[n])roleTemplates[n]=defaultPerms(n)}
 }
-loadRoleTemplates();
+for(const n of roleSetupNames)roleTemplates[n]=defaultPerms(n);
 function roleTemplate(name){return JSON.parse(JSON.stringify(roleTemplates[name]||defaultPerms(name)||{}))}
 let roleSetupScreen='listing';
 let newRoleName='';
@@ -1282,7 +1286,72 @@ const saveRoleSetupV31=saveRoleSetup;
 saveRoleSetup=function(){if(modal==='rolePermissionEdit'){if(role!=='Admin')return roleMessage('Access denied.');roleTemplates[roleSetupSelected]=readPermissions();storeRoleTemplates();log('Role Setup',roleSetupSelected+' default permissions updated');modal='';roleSetupScreen='listing';render();return}return saveRoleSetupV31()};
 // v32: Create User Branch chooser remains multi-select, with the same closed-field look as Role.
 
-try { restore(); render(); }
+try { render(); }
 catch (err) { document.getElementById('root').innerHTML = '<div style="font:16px Arial;padding:35px;color:#ae1734;background:#fff">System startup error: '+String(err&&err.message||err).replace(/</g,'&lt;')+'</div>'; }
+
+
+// v47: Supabase-backed shared workspace (administrator scope only).
+// Auth passwords are NEVER stored in workspace_state. No anonymous access and no offline writable fallback.
+let salesAuthRefreshToken=null;
+let cloudVersion=0, cloudReady=false, cloudDirty=false, cloudSaving=false, cloudSaveTimer=null, cloudStatusMessage='';
+let cloudActivityTimer=null;
+const salesCloudNotice=document.createElement('style');
+salesCloudNotice.textContent='.cloud-banner{display:flex;align-items:center;gap:9px;background:#eef2ff;border:1px solid #dbe3ff;color:#33477a;padding:10px 13px;border-radius:12px;margin-bottom:14px;font-size:12px}.dark .cloud-banner{background:#1a2850;color:#e1eaff;border-color:#354370}.cloud-banner.cloud-error{background:#fff0f1;color:#a2263e;border-color:#ffc7d0}.cloud-banner button{margin-left:auto;border:1px solid currentColor;background:transparent;border-radius:8px;padding:5px 8px;color:inherit;cursor:pointer}';
+document.head.appendChild(salesCloudNotice);
+function cloudClean(x){if(Array.isArray(x))return x.map(cloudClean);if(!x||typeof x!=='object')return x;const o={};for(const [k,v] of Object.entries(x)){if(/password|secret|token|credential|authkey/i.test(k))continue; if(typeof v!=='function')o[k]=cloudClean(v);}return o;}
+function cloudPayload(){return cloudClean({people,branchData,history,notices,loginEvents,ultranetRecords,roleTemplates,roleSetupNames});}
+function cloudApply(p){p=p||{};people=Array.isArray(p.people)?p.people:[];branchData=Array.isArray(p.branchData)?p.branchData:[];branches=branchData.map(b=>b.name);history=Array.isArray(p.history)?p.history:[];notices=Array.isArray(p.notices)?p.notices:[];loginEvents=Array.isArray(p.loginEvents)?p.loginEvents:[];ultranetRecords=Array.isArray(p.ultranetRecords)?p.ultranetRecords:[];roleTemplates=p.roleTemplates&&typeof p.roleTemplates==='object'?p.roleTemplates:{};roleSetupNames=Array.isArray(p.roleSetupNames)?p.roleSetupNames:['Manager','Leader','Member'];for(const n of roleSetupNames)if(!roleTemplates[n])roleTemplates[n]=defaultPerms(n);}
+async function cloudRequest(path,options={}){
+ if(!salesAuthAccessToken)throw new Error('Your session is not authenticated. Sign in again.');
+ let response=await fetch(SALES_AUTH_URL+path,{...options,headers:{'apikey':SALES_AUTH_KEY,'Authorization':'Bearer '+salesAuthAccessToken,'Content-Type':'application/json',...(options.headers||{})}});
+ if(response.status===401 && salesAuthRefreshToken){
+  const renewal=await salesAuthCall('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:salesAuthRefreshToken})});
+  salesAuthAccessToken=renewal.access_token;salesAuthRefreshToken=renewal.refresh_token||salesAuthRefreshToken;
+  response=await fetch(SALES_AUTH_URL+path,{...options,headers:{'apikey':SALES_AUTH_KEY,'Authorization':'Bearer '+salesAuthAccessToken,'Content-Type':'application/json',...(options.headers||{})}});
+ }
+ const body=await response.text();let data;try{data=body?JSON.parse(body):null}catch(e){data=body;}
+ if(!response.ok)throw new Error((data&&typeof data==='object'&&(data.message||data.error_description||data.hint))||('Supabase request failed ('+response.status+')'));
+ return data;
+}
+async function loadCloudWorkspace(){const rows=await cloudRequest('/rest/v1/workspace_state?select=version,payload&singleton=eq.true');if(!Array.isArray(rows)||rows.length!==1)throw new Error('Workspace record missing.');cloudVersion=Number(rows[0].version);cloudApply(rows[0].payload);cloudReady=true;cloudDirty=false;cloudStatusMessage='Saved in Supabase';}
+function cloudSchedule(){if(!cloudReady||!salesAuthAccessToken)return false;cloudDirty=true;cloudStatusMessage='Saving to Supabase…';if(cloudSaveTimer)clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(()=>{flushCloudWorkspace().catch(e=>{cloudStatusMessage=e.message;console.error('Supabase save failed:',e);render();});},500);return true;}
+async function flushCloudWorkspace(){
+ if(cloudSaveTimer){clearTimeout(cloudSaveTimer);cloudSaveTimer=null;}
+ if(!cloudDirty)return;
+ while(cloudSaving)await new Promise(r=>setTimeout(r,60));
+ if(!cloudDirty)return;
+ cloudSaving=true;const payload=cloudPayload(),expected=cloudVersion;cloudDirty=false;
+ try{const ver=await cloudRequest('/rest/v1/rpc/save_sales_workspace',{method:'POST',body:JSON.stringify({expected_version:expected,new_payload:payload})});cloudVersion=Number(ver);cloudStatusMessage='Saved in Supabase';}
+ catch(e){cloudDirty=true;cloudStatusMessage=e.message;throw e}
+ finally{cloudSaving=false}
+ if(cloudDirty)cloudSchedule();
+}
+// Disable v40's preview-only BroadcastChannel, which could overwrite cloud data.
+try{if(syncChannel){syncChannel.onmessage=null;syncChannel.close();syncChannel=null}}catch(e){}
+let cloudPollInterval=null;
+function stopCloudPolling(){if(cloudPollInterval){clearInterval(cloudPollInterval);cloudPollInterval=null}}
+function startCloudPolling(){stopCloudPolling();cloudPollInterval=setInterval(async()=>{
+ if(!sessionUser||!cloudReady||cloudSaving||cloudDirty||document.visibilityState==='hidden')return;
+ try {const rows=await cloudRequest('/rest/v1/workspace_state?select=version&singleton=eq.true');
+ if(!Array.isArray(rows)||!rows.length)return;
+ if(Number(rows[0].version)>cloudVersion){await loadCloudWorkspace();cloudStatusMessage='Synced latest changes';render();}
+ }catch(e){cloudStatusMessage='Connection check failed: '+e.message;console.warn(e)}
+},20000)}
+// Replaces all earlier localStorage and BroadcastChannel persistence overrides.
+persist=function(){return cloudSchedule()};
+restore=function(){};
+storeRoleTemplates=function(){cloudSchedule()};
+// Security: password operations from the offline prototype are NOT real auth account changes.
+// Prevent users from creating fictitious logins or persisting plaintext passwords.
+createAccount=function(){alert('User creation requires secure server-side Supabase Auth provisioning. This action is disabled in the shared-data test release. Add members through Team Management.');};
+saveUserEditor=function(){showModalError('Account editing and password changes require secure server-side Supabase Auth provisioning. Disabled in this release.');};
+savePasswordReset=function(){showModalError('Passwords must be reset via Supabase Auth, not stored in this application.');};
+resetPassword=function(){alert('Password changes are managed in Supabase Authentication.');};
+saveUltranetRecord=function(){showModalError('Ultranet password editing is disabled until a secure credential service is configured.');};
+function cloudBanner(){if(!sessionUser)return '';return '<div class="cloud-banner '+(cloudDirty&&cloudStatusMessage!=='Saving to Supabase…'?'cloud-error':'')+'"><span>☁</span><span>'+esc(cloudStatusMessage||'Supabase connected')+'</span><button onclick="cloudReload()">Reload data</button></div>';}
+async function cloudReload(){if(cloudDirty){alert('Unsaved changes are pending. Please wait for save or resolve the error first.');return;}try{await loadCloudWorkspace();render()}catch(e){alert('Unable to reload Supabase data: '+e.message)}}
+const cloudOriginalRender=render;
+render=function(){cloudOriginalRender();if(sessionUser){const main=document.querySelector('main.main');if(main){const top=main.querySelector('.top');if(top)top.insertAdjacentHTML('afterend',cloudBanner());}}};
+window.addEventListener('beforeunload',e=>{if(cloudDirty){e.preventDefault();e.returnValue='Unsaved Supabase changes';}});
 
 </script></body></html>
