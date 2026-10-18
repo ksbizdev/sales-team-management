@@ -901,14 +901,18 @@ function permissionEditor(perms){return `<div class="tablewrap"><table><thead><t
 function readPermissions(){let p={};document.querySelectorAll('.permcheck:checked').forEach(x=>(p[x.dataset.module]??=[]).push(x.dataset.action));return p}
 function persist(){try{localStorage.setItem('salesTeamCleanV40',JSON.stringify({people,branchData,history,notices,loginEvents}));return true}catch(e){console.warn('Preview storage unavailable or full:',e);return false}}
 function restore(){try{let s=JSON.parse(localStorage.getItem('salesTeamCleanV40'));if(s){people=s.people||people;branchData=s.branchData||[];history=s.history||[];notices=s.notices||[];loginEvents=s.loginEvents||[]}}catch(e){}if(!branchData.length)branchData=branches.map(name=>({name,status:'Active'}));branches=branchData.map(b=>b.name);people.forEach(p=>{if(p.role==='Member')p.branches=[p.branch];else if(!Array.isArray(p.branches)||!p.branches.length)p.branches=[p.branch].filter(Boolean);if(p.role==='Leader'&&byId(p.parent)?.role==='Leader'){let m=rootManager(p);if(m)p.parent=m.id}})}
-// v42: demo-only login credentials. Never use this browser-side authentication for a public production deployment.
-const adminAuth={username:'admin',sessionPassword:'admin123'};
-async function adminPasswordDigest(password,saltHex){
-  if(!globalThis.crypto?.subtle) throw new Error('Password setup requires a secure browser context.');
-  const enc=new TextEncoder();const key=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);
-  const salt=new Uint8Array(saltHex.match(/.{2}/g).map(x=>parseInt(x,16)));
-  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:120000,hash:'SHA-256'},key,256);
-  return Array.from(new Uint8Array(bits),x=>x.toString(16).padStart(2,'0')).join('');
+// v46: Supabase Auth; only the public publishable key is included client-side.
+const SALES_AUTH_URL='https://toptsnsigmiwrthyaatf.supabase.co';
+const SALES_AUTH_KEY='sb_publishable_PpsPRH8h_Ck4OOY29Ppdrw_r80HZXOB';
+// Temporary login alias. This does not hide the email in page source.
+const SALES_ADMIN_EMAIL='ksbizdev@gmail.com';
+let salesAuthAccessToken=null;
+async function salesAuthCall(path,opts={}){
+  const headers={'apikey':SALES_AUTH_KEY,'Content-Type':'application/json',...(opts.headers||{})};
+  const resp=await fetch(SALES_AUTH_URL+path,{...opts,headers});
+  let data;try{data=await resp.json()}catch(e){data={}}
+  if(!resp.ok)throw new Error(data.msg||data.error_description||data.message||data.error||('Request failed ('+resp.status+')'));
+  return data;
 }
 function loginScreen(){return `<div class="moto-login"><div class="moto-login-shell"><section class="moto-hero" aria-label="Motorcycle sales team visual"><div class="moto-hero-photo"></div><div class="moto-lightfield" aria-hidden="true"><span class="moto-spark s1"></span><span class="moto-spark s2"></span><span class="moto-spark s3"></span><span class="moto-spark s4"></span></div></section><section class="moto-form-side"><div class="moto-form-panel"><p class="moto-welcome">Welcome back</p><h1>Sign in</h1><form id="loginForm" onsubmit="return handleLoginSubmit(event)"><div class="moto-field"><label for="loginUsername">Username</label><div class="moto-field-shell"><span class="moto-symbol">♙</span><input id="loginUsername" name="username" type="text" placeholder="Enter username" autocomplete="username" required></div></div><div class="moto-field"><label for="loginPassword">Password</label><div class="moto-field-shell"><span class="moto-symbol">⌑</span><input id="loginPassword" name="password" type="password" placeholder="Enter password" autocomplete="current-password" required><button type="button" class="moto-toggle login-toggle-password" aria-label="Show or hide password" onclick="toggleLoginPassword()">Show</button></div></div><button id="loginButton" type="button" onclick="handleLoginClick()" class="moto-signin">Sign In &nbsp; →</button><p class="moto-error" id="loginError" role="alert" aria-live="polite"></p></form></div></section></div></div>`}
 function toggleLoginPassword(){var el=document.getElementById('loginPassword');if(!el)return;var hidden=el.type==='password';el.type=hidden?'text':'password';var b=document.querySelector('.login-toggle-password');if(b)b.textContent=hidden?'Hide':'Show';}
@@ -925,21 +929,37 @@ function handleLoginClick(){
 }
 function handleLoginSubmit(e){if(e)e.preventDefault();return handleLoginClick();}
 async function login(){
-  const u=(document.getElementById('loginUsername')?.value||'').trim();
-  const pw=document.getElementById('loginPassword')?.value||'';
-  const p=people.find(x=>x.username?.toLowerCase()===u.toLowerCase());
-  const adminOK=Boolean(adminAuth&&u.toLowerCase()===adminAuth.username&&(adminAuth.sessionPassword!==undefined?pw===adminAuth.sessionPassword:await adminPasswordDigest(pw,adminAuth.salt)===adminAuth.hash));
-  const ok=adminOK||Boolean(p&&p.password===pw&&p.enabled&&p.status==='Active');
-  loginEvents.unshift({username:u,event:'Login',time:new Date().toLocaleString(),result:ok?'Success':'Failed'});
-  persist();
-  if(!ok){const msg=document.getElementById('loginError');if(msg)msg.textContent='Invalid username or password, or account disabled.';return;}
-  sessionUser=u.toLowerCase()==='admin'?'admin':p.id;
-  role=sessionUser==='admin'?'Admin':p.role;
-  actor=sessionUser==='admin'?0:p.id;
-  page='Dashboard';
-  render();
+  const userId=(document.getElementById('loginUsername')?.value||'').trim();
+  const password=document.getElementById('loginPassword')?.value||'';
+  const error=document.getElementById('loginError');
+  const btn=document.getElementById('loginButton');
+  if(!userId||!password){if(error)error.textContent='Enter username and password.';return;}
+  if(userId.toLowerCase()!=='admin'){if(error)error.textContent='This version currently supports the administrator account only.';return;}
+  if(btn)btn.disabled=true;
+  try {
+    const signedIn=await salesAuthCall('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:SALES_ADMIN_EMAIL,password})});
+    if(!signedIn.access_token || !signedIn.user?.id)throw new Error('Authentication did not return a valid user.');
+    const profileRes=await fetch(SALES_AUTH_URL+'/rest/v1/user_profiles?select=id,username,enabled&id=eq.'+encodeURIComponent(signedIn.user.id),{headers:{apikey:SALES_AUTH_KEY,Authorization:'Bearer '+signedIn.access_token}});
+    const profiles=await profileRes.json();
+    if(!profileRes.ok || !Array.isArray(profiles)||profiles.length!==1 || profiles[0].username?.toLowerCase()!=='admin'||profiles[0].enabled!==true){
+      await salesAuthCall('/auth/v1/logout',{method:'POST',headers:{Authorization:'Bearer '+signedIn.access_token}}).catch(()=>{});
+      throw new Error('Administrator profile is not linked or is disabled.');
+    }
+    salesAuthAccessToken=signedIn.access_token;
+    sessionUser='admin';role='Admin';actor=0;page='Dashboard';
+    loginEvents.unshift({username:'admin',event:'Login',time:new Date().toLocaleString(),result:'Success'});
+    persist();render();
+  } catch(err){
+    console.warn('Sales Team authentication failed:',err);
+    if(error)error.textContent=/invalid login credentials/i.test(String(err.message))?'Incorrect username or password.':String(err.message||'Unable to sign in.');
+  } finally {if(btn)btn.disabled=false;}
 }
-function logout(){loginEvents.unshift({username:sessionUser==='admin'?'admin':byId(sessionUser)?.username||'',event:'Logout',time:new Date().toLocaleString(),result:'Success'});persist();sessionUser=null;modal='';render()}
+async function logout(){
+ const token=salesAuthAccessToken;salesAuthAccessToken=null;
+ if(token)await salesAuthCall('/auth/v1/logout',{method:'POST',headers:{Authorization:'Bearer '+token}}).catch(()=>{});
+ loginEvents.unshift({username:'admin',event:'Logout',time:new Date().toLocaleString(),result:'Success'});
+ persist();sessionUser=null;modal='';render();
+}
 function branchSetup(){return `<div class="toolbar" style="justify-content:space-between;margin-bottom:18px"><h2>Branch Setup</h2><button class="btn sm" onclick="openBranchEditor(null)">+ Add Branch</button></div>${gridTable('branches')}`}
 
 function addBranch(){let n=prompt('New branch name');if(n===null)return;n=n.trim();if(!n||branchData.some(b=>b.name.toLowerCase()===n.toLowerCase()))return notify('Branch name required and must be unique.');branchData.push({name:n,status:'Active'});branches=branchData.map(b=>b.name);log('Add Branch',n);render()}
