@@ -731,6 +731,21 @@ html,body{max-width:100%;min-width:0;overflow-x:clip}
 .org-tree ul.hier-members-column:before{height:25px}
 .org-tree ul.hier-members-column .hier-card{width:190px;max-width:190px}
 .dark .org-tree ul.hier-members-column>li+li:before{border-left-color:#7790c0}
+
+/* v54: Manager direct reports occupy the first (left) column beside Leaders. */
+.org-tree .hier-manager-direct-row{display:flex;position:relative;align-items:flex-start;justify-content:center;gap:12px;padding-top:25px;width:max-content;max-width:none;margin:0 auto}
+.org-tree .hier-manager-direct-row:before{content:'';position:absolute;top:0;left:50%;height:25px;border-left:2px solid #c5d1e8}
+.org-tree .hier-manager-direct-row>ul{padding-top:0;margin:0;flex:none}
+.org-tree .hier-manager-direct-row>ul:before{display:none}
+.org-tree .hier-manager-direct-row>ul.hier-manager-direct-members{display:flex;flex-direction:column;align-items:center;gap:0;padding:0;min-width:190px}
+.org-tree .hier-manager-direct-row>ul.hier-manager-direct-members>li{padding:0 4px 24px;min-width:190px}
+.org-tree .hier-manager-direct-row>ul.hier-manager-direct-members>li+li{padding-top:0}
+.org-tree .hier-manager-direct-row>ul.hier-manager-direct-members>li+li:before{display:block!important;top:-24px;left:50%;height:24px;border-top:0;border-left:2px solid #c5d1e8;width:0;right:auto}
+.org-tree .hier-manager-direct-row>ul.hier-manager-direct-members>li:last-child{padding-bottom:0}
+.org-tree .hier-manager-direct-row>ul.hier-leaders-row{display:flex;align-items:flex-start;gap:0}
+.org-tree .hier-manager-direct-row>ul.hier-leaders-row>li{padding-top:0}
+.org-tree .hier-manager-direct-row>ul.hier-leaders-row>li:before,.org-tree .hier-manager-direct-row>ul.hier-leaders-row>li:after{display:none}
+.dark .org-tree .hier-manager-direct-row:before,.dark .org-tree .hier-manager-direct-row>ul.hier-manager-direct-members>li+li:before{border-left-color:#7790c0}
 </style></head><body><div id="root"></div><script>
 const initial=[];
 let filterKeyword="",filterExcluded=new Set();let columnFilters={name:null,ic:null,branch:null,role:null,status:null},sortColumn='',sortDirection=1,filterPopup=null,memberModalError='',transferSearch='';let people=initial.map(x=>({...x})),branches=[],history=[],notices=[],page='Dashboard',role='Admin',actor=0,theme='Light',view='List',statusFilter='Active',search='',branchFilter='All',roleFilter='All',managerFilter='All',showInactive=false,selected=null,modal='',adminTab='User Management',pageNo=1,perPage=99999,exportOpen=false;
@@ -869,8 +884,13 @@ function hierarchyNode(p,allowedIds,seen=new Set(),branchName=''){
   const leaders=kids.filter(c=>c.role!=='Member');
   const members=kids.filter(c=>c.role==='Member');
   const leaderGroup=leaders.length?`<ul class="hier-leaders-row">${leaders.map(c=>hierarchyNode(c,allowedIds,nextSeen,branchName)).join('')}</ul>`:'';
-  const memberGroup=members.length?`<ul class="hier-members-column">${members.map(c=>hierarchyNode(c,allowedIds,nextSeen,branchName)).join('')}</ul>`:'';
-  return `<li class="hier-role-${p.role.toLowerCase()}"><div class="hier-card ${p.role.toLowerCase()} ${p.status==='Inactive'?'inactive':''}" onclick="openDetails(${p.id})"><b>${esc(p.name)}</b><small>${p.role==='Manager'?'Sales Manager':p.role==='Leader'?'Sales Team Leader':'Sales Advisor'}</small><small>${esc(branchName)}</small></div>${leaderGroup}${memberGroup}</li>`;
+  const memberGroup=members.length?`<ul class="hier-members-column ${p.role==='Manager'?'hier-manager-direct-members':''}">${members.map(c=>hierarchyNode(c,allowedIds,nextSeen,branchName)).join('')}</ul>`:'';
+  // Direct-to-Manager members belong to the left-most column, at the same
+  // starting height as the leaders. Leaders remain horizontal on the right.
+  const groups=p.role==='Manager'&&members.length&&leaders.length
+    ?`<div class="hier-manager-direct-row">${memberGroup}${leaderGroup}</div>`
+    :`${leaderGroup}${memberGroup}`;
+  return `<li class="hier-role-${p.role.toLowerCase()}"><div class="hier-card ${p.role.toLowerCase()} ${p.status==='Inactive'?'inactive':''}" onclick="openDetails(${p.id})"><b>${esc(p.name)}</b><small>${p.role==='Manager'?'Sales Manager':p.role==='Leader'?'Sales Team Leader':'Sales Advisor'}</small><small>${esc(branchName)}</small></div>${groups}</li>`;
 }
 function renderBranchHierarchy(){
   // Each chart is scoped to exactly one branch. Never pull in an ancestor
