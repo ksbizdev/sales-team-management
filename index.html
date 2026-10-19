@@ -1013,6 +1013,77 @@ html.hierarchy-document-scroll body .chart-scroll::-webkit-scrollbar,body.hierar
 .v73-branch-choice{display:flex!important;gap:8px;align-items:center;font-size:13px!important;font-weight:550!important;color:inherit!important;margin:0!important;cursor:pointer}
 .v73-branch-choice input{width:16px!important;height:16px;flex:none;margin:0}
 @media(max-width:500px){.v73-branch-box{grid-template-columns:1fr}}
+
+/* v76: compact branch selection mirrors Role styling, allows multi-select */
+.member-editor-grid #member-branch-control{min-width:0;position:relative}
+.member-editor-grid .member-branch-dropdown{width:100%;position:relative}
+.member-editor-grid .member-branch-dropdown summary,
+.member-editor-grid select[name="branch"],
+.member-editor-grid select[name="role"]{width:100%!important;max-width:none!important;min-height:43px!important;padding:10px 34px 10px 12px!important;border:1px solid var(--line,#e0e5f0)!important;border-radius:10px!important;background:var(--field,#fff)!important;color:var(--ink,inherit)!important;font-size:14px!important;font-weight:500!important;box-shadow:none!important}
+.member-editor-grid .member-branch-dropdown summary::after{top:12px;right:13px}
+.member-editor-grid .member-branch-dropdown[open]{z-index:110}
+.member-editor-grid .member-branch-options{position:absolute!important;z-index:120!important;top:100%;left:0;width:100%!important;max-height:205px;overflow-y:auto;box-shadow:0 14px 30px #1524442b;margin-top:4px}
+/* v76: user management tabs and prominent Create User share a single toolbar */
+.v76-user-category-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.v76-user-category-bar .user-category-tabs{margin:0;flex:1;min-width:0}
+.v76-create-user{padding:12px 21px!important;min-height:45px;font-size:14px!important;font-weight:800;white-space:nowrap}
+/* v76 phone: compact readable tables and mobile-safe hierarchy */
+@media(max-width:700px){
+ body.hierarchy-page-scroll .app,html.hierarchy-document-scroll body .app{max-width:100vw!important;width:100%!important;overflow-x:hidden!important;display:block!important;padding-bottom:calc(76px + env(safe-area-inset-bottom))!important}
+ html.hierarchy-document-scroll body .main,body.hierarchy-page-scroll .main{width:100%!important;max-width:100%!important;min-width:0!important;flex:1 1 auto!important;overflow:visible!important;padding:12px 9px 95px!important}
+ html.hierarchy-document-scroll body .side,body.hierarchy-page-scroll .side{position:fixed!important;display:flex!important;flex-direction:row!important;padding:6px 5px calc(6px + env(safe-area-inset-bottom))!important;width:100%!important;left:0!important;right:0!important;top:auto!important;bottom:0!important;height:auto!important;min-height:68px!important;z-index:90!important;flex-basis:auto!important}
+ html.hierarchy-document-scroll body #content,html.hierarchy-document-scroll body #content>.card{width:100%!important;max-width:100%!important;min-width:0!important;overflow:visible!important}
+ .hierarchy-page-rail{display:none!important}
+ .new-hier{width:100%!important;overflow:visible!important;padding:10px 0!important}
+ .new-hier .hier-team{width:100%!important;min-width:0!important;max-width:100%!important;padding:12px 6px!important;overflow:visible!important}
+ .new-hier .chart-scroll{width:100%!important;max-width:100%!important;min-width:0!important;overflow:visible!important;padding:6px 0 12px!important}
+ .new-hier .branch-chart-forest{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:14px!important;width:100%!important}
+ .new-hier .org-tree{width:100%!important;max-width:100%!important;min-width:0!important;padding:0!important;display:block!important;margin:0 auto!important}
+ .new-hier .org-tree ul,.new-hier .org-tree .hier-manager-direct-row{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:10px!important;max-width:100%!important;width:100%!important;min-width:0!important;margin:0!important;padding:10px 0 0!important}
+ .new-hier .org-tree>ul{padding-top:0!important}
+ .new-hier .org-tree li{width:100%!important;max-width:100%!important;min-width:0!important;flex:none!important;padding:10px 0 0!important;align-items:center!important}
+ .new-hier .org-tree>ul>li{padding-top:0!important}
+ .new-hier .org-tree .hier-card{width:min(100%,250px)!important;max-width:250px!important;min-width:0!important;padding:10px!important;margin:auto!important}
+ .new-hier .org-tree .hier-card b{font-size:12px!important}
+ .new-hier .org-tree .hier-card small{font-size:10px!important}
+ .new-hier .org-tree li:before,.new-hier .org-tree li:after,.new-hier .org-tree ul:before,.new-hier .org-tree .hier-manager-direct-row:before{display:none!important}
+ .new-hier .org-tree .hier-manager-direct-row>ul.hier-manager-direct-members,.new-hier .org-tree .hier-manager-direct-row>ul.hier-leaders-row{min-width:0!important;width:100%!important;padding:0!important}
+ .new-hier .org-tree ul.hier-members-column>li{padding:10px 0 0!important}
+ .new-hier .org-tree ul.hier-members-column>li+li:before,.new-hier .org-tree .hier-manager-direct-row>ul.hier-manager-direct-members>li+li:before{display:none!important}
+ .main .tablewrap{width:100%!important;max-width:100%!important;overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch}
+ .main .tablewrap table{width:max-content!important;min-width:100%!important;table-layout:auto!important}
+ .main .tablewrap th,.main .tablewrap td{font-size:11px!important;line-height:1.35!important;padding:8px 7px!important;white-space:nowrap!important;min-width:0!important;max-width:190px!important;overflow-wrap:normal!important}
+ .main .tablewrap td strong{font-size:11px!important}
+ .main .tablewrap .pill{font-size:10px!important;padding:3px 6px!important}
+ .main .tablewrap .btn{font-size:10px!important;padding:5px 7px!important}
+ .main .tablewrap input,.main .tablewrap select{font-size:12px!important;max-width:130px!important}
+ .main .card{padding:13px 10px!important}
+ .main .filters{gap:6px!important;flex-wrap:wrap}
+ .main .filters input,.main .filters select{font-size:12px!important;min-height:34px;padding:7px 8px!important}
+ .branch-tabs-shell{max-width:100%!important;min-width:0!important}
+ .v76-user-category-bar{gap:8px}
+ .v76-user-category-bar .user-category-tabs{flex-wrap:nowrap;min-width:0}
+ .v76-user-category-bar .user-category-tabs button{padding:8px!important;font-size:12px!important}
+ .v76-create-user{font-size:12px!important;padding:9px 12px!important;min-height:37px}
+}
+
+/* v77: compact role-style multi-select and responsive company footer */
+.v77-admin-branch-dropdown{width:100%;position:relative;min-width:0}
+.v77-admin-branch-dropdown summary{position:relative;list-style:none;cursor:pointer;width:100%;min-height:43px;padding:11px 35px 11px 12px;border:1px solid var(--line,#d9e0ef);border-radius:10px;background:var(--panel,#fff);color:var(--ink,inherit);font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v77-admin-branch-dropdown summary::-webkit-details-marker{display:none}
+.v77-admin-branch-dropdown summary::after{content:'▾';position:absolute;right:12px;top:10px;color:var(--muted,#6b7390)}
+.v77-admin-branch-dropdown[open]{z-index:500}
+.v77-admin-branch-dropdown[open] summary{border-color:#7770ed;box-shadow:0 0 0 2px #7770ed20}
+.v77-admin-branch-options{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel,#fff);border:1px solid var(--line,#d9e0ef);border-radius:11px;box-shadow:0 15px 30px #18224a35;max-height:205px;overflow-y:auto;z-index:501;padding:6px}
+.v77-admin-branch-options label{display:flex!important;align-items:center;gap:9px;font-size:13px!important;font-weight:500!important;padding:9px 8px!important;border-radius:7px!important;cursor:pointer!important;margin:0!important;color:var(--ink,inherit)!important}
+.v77-admin-branch-options label:hover{background:#8896bd15}
+.v77-admin-branch-options input{width:15px!important;height:15px!important;min-width:15px!important;margin:0!important}
+.admin-create-form #newAdminFullName,.admin-create-form #newAdminUserId{text-transform:uppercase}
+.v77-copyright{width:100%;font-size:11px;color:var(--muted,#8190a9);text-align:right;line-height:1.5;padding:18px 4px 6px;margin-top:auto;clear:both;pointer-events:none}
+.main{display:flex;flex-direction:column}
+.main #content{flex:1 0 auto}
+.v77-login-copyright{position:fixed;bottom:11px;right:18px;z-index:12;color:#d1d8e9;font-size:11px;text-align:right;text-shadow:0 1px 5px #0009;pointer-events:none}
+@media(max-width:700px){.v77-copyright{font-size:9px;padding:12px 5px 14px;text-align:right}.v77-login-copyright{bottom:9px;right:12px;left:12px;font-size:9px}.v77-admin-branch-dropdown summary{font-size:13px}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1422,9 +1493,10 @@ async function login(){
     salesAuthExpiresAt=Date.now()+Math.max(30,Number(signedIn.expires_in||3600))*1000;
     saveSalesSession();
     try { await loadCloudWorkspace(); } catch(loadError) {salesAuthAccessToken=null; salesAuthRefreshToken=null; clearSalesSession(); throw new Error('Workspace could not load: '+loadError.message);}
-    sessionUser='admin';role='Admin';actor=0;await refreshUltranetPermission();restoreSalesView();startCloudPolling();
+    sessionUser='admin';role='Admin';actor=0;restoreSalesView();startCloudPolling();
     loginEvents.unshift({username:'admin',event:'Login',time:new Date().toLocaleString(),result:'Success'});
     persist();render();
+    refreshUltranetPermission().catch(err=>console.warn('Ultranet permission refresh:',err));
   } catch(err){
     console.warn('Sales Team authentication failed:',err);
     if(error)error.textContent=/invalid login credentials/i.test(String(err.message))?'Incorrect username or password.':String(err.message||'Unable to sign in.');
@@ -1780,7 +1852,7 @@ function rememberSalesView(){try{localStorage.setItem(SALES_VIEW_KEY,JSON.string
 function clearSalesView(){try{localStorage.removeItem(SALES_VIEW_KEY)}catch(e){}}
 function restoreSalesView(){try{const p=JSON.parse(localStorage.getItem(SALES_VIEW_KEY)||'null');if(!p)return;const allowed=['Dashboard','Team Management','Ultranet','Activity History','Administration'];if(allowed.includes(p.page)&&hasModule(p.page))page=p.page;if(['User Management','Role Setup','Branch Setup','Login History'].includes(p.adminTab))adminTab=p.adminTab;if(['Light','Starlight'].includes(p.theme))theme=p.theme;if(['List','Hierarchy'].includes(p.view))view=p.view;if(typeof p.branchFilter==='string'&&(p.branchFilter==='All'||branches.includes(p.branchFilter)))branchFilter=p.branchFilter;if(['Active','Inactive','All'].includes(p.statusFilter))statusFilter=p.statusFilter;if(['All','Manager','Leader','Member'].includes(p.roleFilter))roleFilter=p.roleFilter;}catch(e){console.warn('Could not restore view:',e)}}
 async function renewSalesSession(){if(salesRefreshPromise)return salesRefreshPromise;if(!salesAuthRefreshToken)throw new Error('Session expired. Please sign in again.');salesRefreshPromise=(async()=>{const renewed=await salesAuthCall('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:salesAuthRefreshToken})});if(!renewed.access_token)throw new Error('Session renewal failed.');salesAuthAccessToken=renewed.access_token;salesAuthRefreshToken=renewed.refresh_token||salesAuthRefreshToken;salesAuthExpiresAt=Date.now()+Math.max(30,Number(renewed.expires_in||3600))*1000;saveSalesSession();return renewed;})();try{return await salesRefreshPromise}finally{salesRefreshPromise=null}}
-async function restoreSalesSession(){let stored;try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){return}if(!stored?.refresh_token)return;salesAuthRefreshToken=stored.refresh_token;salesAuthAccessToken=stored.access_token||null;salesAuthExpiresAt=Number(stored.expires_at||0);try{if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();const response=await cloudRequest('/rest/v1/user_profiles?select=id,username,enabled&username=eq.admin');if(!Array.isArray(response)||response.length!==1||response[0].enabled!==true)throw Error('Administrator access disabled');await loadCloudWorkspace();sessionUser='admin';role='Admin';actor=0;await refreshUltranetPermission();restoreSalesView();startCloudPolling();render();}catch(e){console.warn('Unable to restore authenticated session:',e);if(/fetch|network|connection/i.test(String(e.message||e))){showRestoringShell('Connection unavailable. Your page is preserved.','Retry connection');}else{salesAuthAccessToken=null;salesAuthRefreshToken=null;clearSalesSession();render();} }}
+async function restoreSalesSession(){let stored;try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){return}if(!stored?.refresh_token)return;salesAuthRefreshToken=stored.refresh_token;salesAuthAccessToken=stored.access_token||null;salesAuthExpiresAt=Number(stored.expires_at||0);try{if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();const response=await cloudRequest('/rest/v1/user_profiles?select=id,username,enabled&username=eq.admin');if(!Array.isArray(response)||response.length!==1||response[0].enabled!==true)throw Error('Administrator access disabled');await loadCloudWorkspace();sessionUser='admin';role='Admin';actor=0;restoreSalesView();startCloudPolling();render();}catch(e){console.warn('Unable to restore authenticated session:',e);if(/fetch|network|connection/i.test(String(e.message||e))){showRestoringShell('Connection unavailable. Your page is preserved.','Retry connection');}else{salesAuthAccessToken=null;salesAuthRefreshToken=null;clearSalesSession();render();} }}
 let cloudVersion=0, cloudReady=false, cloudDirty=false, cloudSaving=false, cloudSaveTimer=null, cloudStatusMessage='';
 let cloudActivityTimer=null;
 const salesCloudNotice=document.createElement('style');
@@ -2635,4 +2707,75 @@ document.addEventListener('click',function(event){
  }
 },true);
 
+
+/* v76 user management layout: category tabs left, Create User right, no refresh control. */
+const v76PreviousUserManagement=userManagement;
+userManagement=function(){
+ let html=v76PreviousUserManagement();
+ html=html.replace(/<div class="toolbar" style="justify-content:space-between;margin-bottom:16px"><h2 style="margin:0">User Management<\/h2><button class="btn sm" onclick="openCategorizedAccountCreate\(\)">\+ Create User<\/button><\/div>/,
+ '<h2 style="margin:0 0 13px">User Management</h2>');
+ html=html.replace(/<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 0 10px"><button class="btn ghost sm" onclick="refreshAdminAccountDirectory\(\)">↻ Refresh Accounts<\/button><\/div>/,'');
+ html=html.replace('<div class="user-category-tabs">','<div class="v76-user-category-bar"><div class="user-category-tabs">');
+ html=html.replace('</div>\n<input class="user-directory-search"','</div><button class="btn v76-create-user" onclick="openCategorizedAccountCreate()">+ Create User</button></div>\n<input class="user-directory-search"');
+ return html;
+};
+/* v76 phone: chart becomes a stacked layout; desktop still has a dedicated bottom rail. */
+const v76PreviousRail=setupV69HierarchyRail;
+setupV69HierarchyRail=function(){
+ if(window.matchMedia('(max-width:700px)').matches){document.getElementById('hierarchyPageRail')?.remove();return}
+ return v76PreviousRail();
+};
+/* If network stalls, show a specific message instead of an endless credential spinner. */
+const v76PreviousSalesSessionRequest=salesSessionRequest;
+salesSessionRequest=async function(action,details={},token=null){
+ const task=v76PreviousSalesSessionRequest(action,details,token);
+ let timeoutId;
+ try{return await Promise.race([task,new Promise((_,reject)=>{timeoutId=setTimeout(()=>reject(new Error('Connection timed out. Please try again.')),18000)})])}
+ finally{if(timeoutId)clearTimeout(timeoutId)}
+};
+
+/* v77: Admin form branch selector; match the Role control but allow multiple branches. */
+v73BranchOptions=function(selected){
+ const names=(branchData||[]).filter(b=>b.status!=='Inactive').map(b=>b.name).filter(Boolean);
+ const chosen=Array.isArray(selected)&&selected.length?selected:['All Branches'];
+ const rows=['All Branches',...names];
+ const label=chosen.includes('All Branches')?'All Branches':chosen.join(', ');
+ return `<details class="v77-admin-branch-dropdown"><summary id="v77-branch-caption">${esc(label||'Select Branches')}</summary><div class="v77-admin-branch-options">${rows.map(b=>`<label><input type="checkbox" data-admin-branch="${esc(b)}" ${chosen.includes(b)?'checked':''} onchange="v73ToggleBranches(this);v77RefreshBranches()"><span>${esc(b)}</span></label>`).join('')}</div></details>`;
+};
+function v77RefreshBranches(){
+ const chosen=[...document.querySelectorAll('[data-admin-branch]:checked')].map(x=>x.dataset.adminBranch);
+ const caption=document.getElementById('v77-branch-caption');
+ if(caption)caption.textContent=chosen.includes('All Branches')?'All Branches':(chosen.join(', ')||'Select Branches');
+}
+/* Input is visually upper-case while User ID is normalized internally for Auth. */
+const v77OriginalAdminForm=v73AdminForm;
+v73AdminForm=function(account){
+ const html=v77OriginalAdminForm(account);
+ return html.replace('id="newAdminFullName"','id="newAdminFullName" oninput="this.value=this.value.toUpperCase()"')
+   .replace('id="newAdminUserId"','id="newAdminUserId" oninput="this.value=this.value.toUpperCase()"');
+};
+const v77BeforeRender=render;
+render=function(){
+ // If the user has lost a module's View grant, don't show its content.
+ if(salesRestricted()&&sessionUser&&page&&!hasModule(page)){
+  page=['Dashboard','Team Management','Ultranet','Activity History','Administration'].find(hasModule)||'Dashboard';
+ }
+ v77BeforeRender();
+ // v75 only shows the legacy read-only banner; keep restrictions without that banner.
+ document.querySelectorAll('.cloud-banner').forEach(el=>{if(el.textContent?.includes('Read-only access'))el.remove()});
+ if(salesRestricted()){
+  document.querySelectorAll('aside.side button[data-nav]').forEach(btn=>{
+   const module=btn.dataset.nav;
+   if(!hasModule(module))btn.remove();
+  });
+ }
+ const foot='© 2026 Keat Seng Motor Sdn Bhd. All rights reserved.';
+ if(sessionUser){
+  const main=document.querySelector('main.main');
+  if(main&&!main.querySelector('.v77-copyright'))main.insertAdjacentHTML('beforeend','<footer class="v77-copyright">'+foot+'</footer>');
+ }else{
+  const root=document.getElementById('root');
+  if(root&&!root.querySelector('.v77-login-copyright'))root.insertAdjacentHTML('beforeend','<footer class="v77-login-copyright">'+foot+'</footer>');
+ }
+};
 </script></body></html>
