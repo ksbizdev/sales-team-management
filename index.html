@@ -2815,11 +2815,9 @@ render=function(){v75Render();if(!salesRestricted())return;
 /* Extra guard for modal actions in restricted preview sessions. */
 const v75PreviousUltranetPermission=refreshUltranetPermission;
 refreshUltranetPermission=async function(){
- if(salesRestricted()){
-  ultranetServerPermission=false;
-  ultranetPasswordIds.clear();
-  return;
- }
+ // v91: Every authenticated user, not only the original admin, must be checked
+ // by the protected Supabase RPC. The server verifies View Password and the
+ // member's branch scope before returning the password or presence markers.
  return v75PreviousUltranetPermission();
 };
 document.addEventListener('click',function(event){
