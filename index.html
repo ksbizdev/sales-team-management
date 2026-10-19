@@ -939,6 +939,43 @@ html.hierarchy-document-scroll body .hier-horizontal-bar{display:none!important}
  /* Mobile keeps its existing fixed bottom navigation, not a horizontally moving sidebar. */
  html.hierarchy-document-scroll body .side{position:fixed!important}
 }
+
+/* v69: one bottom scrollbar scoped to the content side, scrolling charts only. */
+html.hierarchy-document-scroll,html.hierarchy-document-scroll body,
+body.hierarchy-page-scroll{width:100%!important;max-width:100%!important;overflow-x:hidden!important}
+html.hierarchy-document-scroll body .app,body.hierarchy-page-scroll .app{width:100%!important;min-width:0!important;max-width:100%!important;padding-left:0!important;display:flex!important}
+html.hierarchy-document-scroll body .side,body.hierarchy-page-scroll .side{position:sticky!important;top:0!important;left:auto!important;bottom:auto!important;height:100vh!important;width:245px!important;flex:0 0 245px!important;z-index:35!important}
+html.hierarchy-document-scroll body .main,body.hierarchy-page-scroll .main{width:auto!important;min-width:0!important;max-width:none!important;flex:1 1 0!important;overflow:hidden!important;padding-bottom:42px!important}
+html.hierarchy-document-scroll body #content,html.hierarchy-document-scroll body #content>.card,
+body.hierarchy-page-scroll .main #content,body.hierarchy-page-scroll .main #content>.card{width:100%!important;min-width:0!important;max-width:100%!important;overflow:visible!important}
+html.hierarchy-document-scroll body .new-hier,html.hierarchy-document-scroll body .hier-team,
+body.hierarchy-page-scroll .new-hier,body.hierarchy-page-scroll .hier-team{width:100%!important;max-width:100%!important;min-width:0!important;overflow:hidden!important}
+html.hierarchy-document-scroll body .chart-scroll,body.hierarchy-page-scroll .chart-scroll{
+ width:100%!important;max-width:100%!important;min-width:0!important;
+ overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;
+ -ms-overflow-style:none!important;padding-bottom:3px!important;
+}
+html.hierarchy-document-scroll body .chart-scroll::-webkit-scrollbar{display:none!important;height:0!important}
+html.hierarchy-document-scroll body .hier-horizontal-bar{display:none!important}
+.hierarchy-page-rail{position:fixed;z-index:26;bottom:0;right:0;left:245px;height:23px;padding:3px 12px;background:var(--panel,#fff);border-top:1px solid #dbe2ef;box-shadow:0 -2px 10px #20305a0d}
+.hierarchy-page-rail .rail-scroll{overflow-x:auto;overflow-y:hidden;width:100%;height:16px;scrollbar-width:auto;scrollbar-color:#9aa9b9 #e8edf5}
+.hierarchy-page-rail .rail-scroll::-webkit-scrollbar{height:12px}
+.hierarchy-page-rail .rail-scroll::-webkit-scrollbar-thumb{background:#9aa9b9;border-radius:8px;border:2px solid #edf1f8}
+.hierarchy-page-rail .rail-spacer{height:1px}
+.dark .hierarchy-page-rail{background:#152442;border-color:#374a6e}
+.sales-person-picker{position:relative;margin:7px 0 12px}
+.sales-person-picker input{width:100%;padding-right:38px}
+.sales-person-picker .picker-caret{position:absolute;right:14px;top:11px;pointer-events:none;color:#8793ac}
+.sales-person-dropdown{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:260px;overflow-y:auto;z-index:300;background:var(--panel,#fff);border:1px solid #ced8ec;border-radius:12px;box-shadow:0 14px 35px #18254835;padding:5px}
+.sales-person-dropdown[hidden]{display:none!important}
+.sales-person-option{display:block;text-align:left;width:100%;padding:10px 11px;border:0;border-radius:8px;background:transparent;color:inherit;font-size:13px}
+.sales-person-option:hover,.sales-person-option:focus{background:#eef1ff;color:#4f5bc0}
+.sales-person-option small{display:block;font-size:11px;color:#8390a8;margin-top:4px}
+.sales-person-empty{padding:12px;color:#8a96ac;font-size:12px}
+.dark .sales-person-dropdown{border-color:#405577}
+.dark .sales-person-option:hover{background:#283c68;color:#fff}
+@media(max-width:900px){html.hierarchy-document-scroll body .side,body.hierarchy-page-scroll .side{width:72px!important;flex-basis:72px!important}.hierarchy-page-rail{left:72px}}
+@media(max-width:520px){html.hierarchy-document-scroll body .side,body.hierarchy-page-scroll .side{width:56px!important;flex-basis:56px!important}.hierarchy-page-rail{left:56px}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1987,8 +2024,8 @@ function categorizedAccountForm(){
  const category=createAccountCategory;
  const chosen=byId(selectedLoginMemberId)||people.find(p=>p.status==='Active');
  return `<div class="user-category-modal-row"><button class="btn ${category==='Admin'?'':'secondary'}" onclick="switchNewAccountCategory('Admin')">Admin</button><button class="btn ${category==='Salesperson'?'':'secondary'}" onclick="switchNewAccountCategory('Salesperson')">Salesperson</button></div>
-${category==='Salesperson'?`<label for="accountPersonSearch">Salesperson (Team Management)</label><input id="accountPersonSearch" type="search" placeholder="Search by name, IC No., User ID, role or branch" autocomplete="off" oninput="filterNewAccountSalespeople(this.value)" style="width:100%;margin:7px 0 10px"><select id="accountPersonId" onchange="refreshCategorizedAccountSummary()" style="width:100%;max-width:none"><option value="">Select Member</option>${people.filter(p=>p.status==='Active').map(p=>`<option value="${Number(p.id)}" ${Number(selectedLoginMemberId)===Number(p.id)?'selected':''}>${esc(p.name)} — ${esc(p.role)}</option>`).join('')}</select><div id="categorizedLinkedSummary">${selectedLoginMemberId&&chosen?accountLinkedInfo(chosen):'Select a Team Management member.'}</div>`:`<div class="admin-create-form"><div><label for="newAdminFullName">Full Name *</label><input id="newAdminFullName" placeholder="Enter full name" autocomplete="name"></div><div><label for="newAdminUserId">User ID *</label><input id="newAdminUserId" placeholder="Enter User ID" autocomplete="off"></div><div><label for="newAdminPassword">Password *</label><input id="newAdminPassword" type="password" placeholder="At least 10 characters" autocomplete="new-password"></div></div><p class="muted">New administrator accounts require the secure server-side account creation endpoint to be enabled. Your password will not be stored in the page or shared workspace.</p>`}
-${category==='Salesperson'?`<label style="display:block;margin-top:14px">Login Password *</label><input type="password" id="categoryPassword" autocomplete="new-password" minlength="10" placeholder="Minimum 10 characters"><p class="user-category-note">Name, Branch, Role and User ID are linked automatically. Password is sent to Supabase Auth, never saved in workspace data. Staff sign-in and branch-specific access remain restricted until role-based access is completed.</p>`:''}
+${category==='Salesperson'?`<label for="accountPersonSearch">Salesperson (Team Management)</label><div class="sales-person-picker"><input id="accountPersonSearch" type="search" role="combobox" aria-controls="salesPersonDropdown" aria-expanded="false" placeholder="Type name, IC No., User ID, role or branch" autocomplete="off" onfocus="showSalespersonDropdown()" oninput="onSalespersonPickerInput(this.value)" onkeydown="onSalespersonPickerKey(event)"><span class="picker-caret">⌄</span><div id="salesPersonDropdown" class="sales-person-dropdown" role="listbox" hidden></div><input id="accountPersonId" type="hidden" value="${selectedLoginMemberId||''}"></div><div id="categorizedLinkedSummary">${selectedLoginMemberId&&chosen?accountLinkedInfo(chosen):'Select a Team Management member.'}</div>`:`<div class="admin-create-form"><div><label for="newAdminFullName">Full Name *</label><input id="newAdminFullName" placeholder="Enter full name" autocomplete="name"></div><div><label for="newAdminUserId">User ID *</label><input id="newAdminUserId" placeholder="Enter User ID" autocomplete="off"></div><div><label for="newAdminPassword">Password *</label><input id="newAdminPassword" type="password" placeholder="Enter login password" autocomplete="new-password"></div></div><p class="muted">New administrator accounts require the secure server-side account creation endpoint to be enabled. Your password will not be stored in the page or shared workspace.</p>`}
+${category==='Salesperson'?`<label style="display:block;margin-top:14px">Login Password *</label><input type="password" id="categoryPassword" autocomplete="new-password" placeholder="Enter login password"><p class="user-category-note">Name, Branch, Role and User ID are linked automatically. Password is sent to Supabase Auth, never saved in workspace data. Staff sign-in and branch-specific access remain restricted until role-based access is completed.</p>`:''}
 <div class="actions" style="margin-top:20px">${category==='Salesperson'?'<button class="btn" id="categoryCreateButton" onclick="saveCategorizedAccount()">Create User</button>':'<button class="btn" id="categoryCreateButton" onclick="saveAdminAccount()">Create Admin</button>'}<button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
 }
 
@@ -1998,7 +2035,7 @@ async function saveAdminAccount(){
  const password=String(document.getElementById('newAdminPassword')?.value||'');
  if(!name)return showModalError('Full Name is required.');
  if(!/^[a-z0-9][a-z0-9._-]{2,59}$/.test(username))return showModalError('User ID must be 3–60 letters, numbers, dots, dashes or underscores.');
- if(password.length<10)return showModalError('Password must be at least 10 characters.');
+ if(!password)return showModalError('Please enter a password.');
  const btn=document.getElementById('categoryCreateButton');if(btn)btn.disabled=true;
  try{
    await accountAdminRequest({action:'create_admin',full_name:name,username,password});
@@ -2013,15 +2050,15 @@ async function saveCategorizedAccount(){
  if(!p||p.status!=='Active')return showModalError('Select an active salesperson.');
  if(!username)return showModalError('Please set this member’s Ultranet User ID first.');
  if(!/^[a-z0-9][a-z0-9._-]{2,59}$/.test(username))return showModalError('User ID must be 3–60 letters, numbers, periods, dashes or underscores.');
- if(password.length<10)return showModalError('Password must be at least 10 characters.');
+ if(!password)return showModalError('Please enter a password.');
  const button=$('categoryCreateButton');if(button)button.disabled=true;
  try{await accountAdminRequest({action:'create_salesperson',member_id:p.id,username,full_name:p.name,role:p.role,password});
  log('Create User',p.name+' login provisioned');modal='';accountCategory='Salesperson';await fetchAccountDirectory();render();
  }catch(err){showModalError(err.message)}finally{if(button&&button.isConnected)button.disabled=false}
 }
 function openSalespersonAccount(id){selectedLoginMemberId=id;modal='salespersonAccount';render()}
-function salespersonAccountForm(){const p=byId(selectedLoginMemberId);if(!p)return 'Member not found';const active=adminAccountDirectory.find(x=>x.category==='Salesperson'&&Number(x.member_id)===Number(p.id));return `${accountLinkedInfo(p)}${active?`<label>New Login Password</label><input id="salesResetPassword" type="password" autocomplete="new-password" placeholder="Minimum 10 characters"><div class="actions" style="margin-top:18px"><button class="btn" onclick="resetSalespersonPassword()">Update Password</button><button class="btn ghost" onclick="closeModal()">Close</button></div>`:`<div class="actions"><button class="btn" onclick="selectedLoginMemberId=${Number(p.id)};createAccountCategory='Salesperson';modal='categorizedAccount';render()">Create User</button><button class="btn ghost" onclick="closeModal()">Close</button></div>`}`}
-async function resetSalespersonPassword(){const pw=$('salesResetPassword')?.value||'';if(pw.length<10)return showModalError('Use at least 10 characters.');try{await accountAdminRequest({action:'reset_salesperson',member_id:selectedLoginMemberId,password:pw});log('Reset Password',byId(selectedLoginMemberId)?.name+' login password reset');closeModal()}catch(err){showModalError(err.message)}}
+function salespersonAccountForm(){const p=byId(selectedLoginMemberId);if(!p)return 'Member not found';const active=adminAccountDirectory.find(x=>x.category==='Salesperson'&&Number(x.member_id)===Number(p.id));return `${accountLinkedInfo(p)}${active?`<label>New Login Password</label><input id="salesResetPassword" type="password" autocomplete="new-password" placeholder="Enter new password"><div class="actions" style="margin-top:18px"><button class="btn" onclick="resetSalespersonPassword()">Update Password</button><button class="btn ghost" onclick="closeModal()">Close</button></div>`:`<div class="actions"><button class="btn" onclick="selectedLoginMemberId=${Number(p.id)};createAccountCategory='Salesperson';modal='categorizedAccount';render()">Create User</button><button class="btn ghost" onclick="closeModal()">Close</button></div>`}`}
+async function resetSalespersonPassword(){const pw=$('salesResetPassword')?.value||'';if(!pw)return showModalError('Please enter a password.');try{await accountAdminRequest({action:'reset_salesperson',member_id:selectedLoginMemberId,password:pw});log('Reset Password',byId(selectedLoginMemberId)?.name+' login password reset');closeModal()}catch(err){showModalError(err.message)}}
 const _modalV65=modalHTML;
 modalHTML=function(){
  if(!['categorizedAccount','salespersonAccount'].includes(modal))return _modalV65();
@@ -2070,4 +2107,42 @@ gridBody=function(kind){
  if(kind!=='activity')return v66AuditGridBody(kind);
  return gridFiltered('activity').map(h=>{const a=String(h.action||'Other');const cls=/^(Add|Edit|Delete)$/.test(a)?a.toLowerCase():'';return `<tr><td>${esc(h.time)}</td><td>${esc(h.userId)}</td><td>${esc(h.module)}</td><td><span class="activity-action-badge ${cls}">${esc(a)}</span></td><td>${esc(h.detail)}</td></tr>`}).join('')||'<tr><td colspan="5" class="empty">No activity</td></tr>';
 };
+
+/* v69: fixed left navigation and one bottom horizontal rail on the content area. */
+function setupV69HierarchyRail(){
+ const old=document.getElementById('hierarchyPageRail');if(old)old.remove();
+ if(!(sessionUser&&page==='Team Management'&&view==='Hierarchy'))return;
+ const charts=[...document.querySelectorAll('.new-hier .chart-scroll')];
+ if(!charts.length)return;
+ const maxWidth=Math.max(...charts.map(c=>c.scrollWidth),0);
+ const available=Math.max(...charts.map(c=>c.clientWidth),0);
+ if(maxWidth<=available+2)return;
+ const rail=document.createElement('div');rail.className='hierarchy-page-rail';rail.id='hierarchyPageRail';
+ rail.innerHTML='<div class="rail-scroll" id="hierarchyRailScroller" aria-label="Scroll hierarchy charts horizontally" role="region"><div class="rail-spacer"></div></div>';
+ document.body.appendChild(rail);
+ const scroller=document.getElementById('hierarchyRailScroller');
+ const inner=scroller.firstElementChild;
+ inner.style.width=Math.max(maxWidth,scroller.clientWidth)+'px';
+ scroller.addEventListener('scroll',()=>{const x=scroller.scrollLeft;charts.forEach(c=>{if(Math.abs(c.scrollLeft-x)>1)c.scrollLeft=x})},{passive:true});
+ charts.forEach(c=>c.addEventListener('scroll',()=>{if(Math.abs(scroller.scrollLeft-c.scrollLeft)>2)scroller.scrollLeft=c.scrollLeft},{passive:true}));
+}
+const v69PreviousRender=render;
+render=function(){
+ v69PreviousRender();
+ requestAnimationFrame(setupV69HierarchyRail);
+};
+window.addEventListener('resize',()=>requestAnimationFrame(setupV69HierarchyRail),{passive:true});
+function salespersonPickerMatches(query){const kw=String(query||'').trim().toLowerCase();return people.filter(p=>p.status==='Active'&&[p.name,p.ic,p.role,linkedUltranetId(p.id),memberBranchText(p)].some(v=>String(v||'').toLowerCase().includes(kw))).slice(0,80)}
+function showSalespersonDropdown(){filterNewAccountSalespeople(document.getElementById('accountPersonSearch')?.value||'')}
+function onSalespersonPickerInput(query){selectedLoginMemberId=null;const hidden=document.getElementById('accountPersonId');if(hidden)hidden.value='';const summary=document.getElementById('categorizedLinkedSummary');if(summary)summary.textContent='Select a Team Management member.';filterNewAccountSalespeople(query)}
+function filterNewAccountSalespeople(query){
+ const dropdown=document.getElementById('salesPersonDropdown'),input=document.getElementById('accountPersonSearch');
+ if(!dropdown||!input)return;
+ const matches=salespersonPickerMatches(query);
+ dropdown.innerHTML=matches.length?matches.map(p=>'<button type="button" role="option" class="sales-person-option" onmousedown="event.preventDefault()" onclick="chooseNewAccountSalesperson('+Number(p.id)+')">'+esc(p.name)+'<small>'+esc(linkedUltranetId(p.id)||'No User ID')+' · '+esc(p.role)+' · '+esc(memberBranchText(p))+'</small></button>').join(''):'<div class="sales-person-empty">No matching salespeople</div>';
+ dropdown.hidden=false;input.setAttribute('aria-expanded','true');
+}
+function chooseNewAccountSalesperson(id){const p=byId(Number(id)),input=document.getElementById('accountPersonSearch'),hidden=document.getElementById('accountPersonId'),dropdown=document.getElementById('salesPersonDropdown');if(!p)return;selectedLoginMemberId=p.id;if(input){input.value=p.name;input.setAttribute('aria-expanded','false')}if(hidden)hidden.value=String(p.id);if(dropdown)dropdown.hidden=true;refreshCategorizedAccountSummary()}
+function onSalespersonPickerKey(e){if(e.key==='Escape'){const d=document.getElementById('salesPersonDropdown');if(d)d.hidden=true;const i=document.getElementById('accountPersonSearch');if(i)i.setAttribute('aria-expanded','false');return;}if(e.key==='Enter'){e.preventDefault();const first=salespersonPickerMatches(e.currentTarget.value)[0];if(first)chooseNewAccountSalesperson(first.id)}}
+document.addEventListener('pointerdown',e=>{const picker=document.querySelector('.sales-person-picker');if(picker&&!picker.contains(e.target)){const d=document.getElementById('salesPersonDropdown'),i=document.getElementById('accountPersonSearch');if(d)d.hidden=true;if(i)i.setAttribute('aria-expanded','false')}});
 </script></body></html>
