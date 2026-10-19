@@ -1146,8 +1146,15 @@ html.hierarchy-document-scroll body .chart-scroll::-webkit-scrollbar,body.hierar
  .new-hier .org-tree .hier-manager-direct-row>ul.hier-leaders-row>li{padding-top:0!important}
 }
 
-.ultra-copy-btn{min-width:30px;padding:5px 8px;line-height:1;font-size:17px}.ultra-copy-btn:disabled{opacity:.35;cursor:not-allowed}
-.ultranet-export-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}.ultranet-export-toolbar .btn{font-weight:700;padding:10px 17px}
+.ultra-copy-btn{width:30px!important;height:30px!important;min-width:30px!important;padding:0!important;border:1px solid rgba(112,120,190,.23)!important;border-radius:10px!important;display:inline-flex!important;align-items:center;justify-content:center;vertical-align:middle;color:#6772c4!important;background:linear-gradient(145deg,#f6f7ff,#eef0ff)!important;box-shadow:0 2px 7px rgba(64,76,133,.08)!important;transition:transform .16s ease,background .16s ease,box-shadow .16s ease!important}
+.ultra-copy-btn:hover:not(:disabled){background:#e3e8ff!important;color:#435bb5!important;box-shadow:0 5px 12px rgba(70,85,174,.18)!important;transform:translateY(-2px)}
+.ultra-copy-btn:active:not(:disabled){transform:scale(.94)}
+.ultra-copy-btn:focus-visible{outline:2px solid #858fea;outline-offset:2px}
+.ultra-copy-btn:disabled{opacity:.33;cursor:not-allowed;box-shadow:none!important}
+.ultra-copy-btn svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+body.starlight .ultra-copy-btn,body.dark .ultra-copy-btn{background:#263258!important;color:#c7d0ff!important;border-color:rgba(180,185,255,.25)!important}
+.ultranet-export-inline{margin-left:auto;white-space:nowrap;font-weight:700;padding:10px 17px!important}
+@media(max-width:620px){.ultranet-export-inline{margin-left:0;width:100%}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1688,7 +1695,7 @@ function ultranetData(){
 function ultranet(){
  const branchesForTabs=['All',...branches],rows=ultranetData();
  const cols=[['branch','Branch'],['name','Full Name'],['role','Role'],['status','Status'],['userId','User ID'],...(canViewUltranetPassword()?[['password','Password']]:[])];
- return `<div class="card"><div class="ultranet-export-toolbar"><span class="muted">Current branch and filters</span>${ultranetCanExportPasswords()?`<button class="btn secondary sm" type="button" onclick="exportUltranetPDF()">⇩ Export PDF</button>`:canAction('Ultranet','Export')?`<span class="muted" title="Exporting passwords also requires View Password permission">PDF with passwords requires View Password permission</span>`:''}</div><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select></div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
+ return `<div class="card"><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select>${ultranetCanExportPasswords()?`<button class="btn secondary sm ultranet-export-inline" type="button" onclick="exportUltranetPDF()">⇩ Export PDF</button>`:canAction('Ultranet','Export')?`<span class="muted" title="Exporting passwords also requires View Password permission">PDF with passwords requires View Password permission</span>`:''}</div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
 }
 function ultranetRowsHTML(rows){
  let previousGroup='';
@@ -1700,7 +1707,7 @@ function ultranetRowsHTML(rows){
   const separator=isGroupStart?`<tr class="team-group-divider ${group.leaderId?'team-group-leader':'team-group-manager'}"><td colspan="${count}"><span class="group-label">${groupLabel}</span></td></tr>`:'';
   const rc=m.role==='Manager'?'ultra-manager-row':m.role==='Leader'?'ultra-leader-row':'';
   const canOpen=ulAllowed('Edit')||ulAllowed('Add');
-  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td><div class="ultra-secret-cell"><span>${esc(x.record?.userId||'—')}</span><button class="btn ghost sm ultra-copy-btn" type="button" onclick="event.stopPropagation();copyUltranetUserId(${m.id})" aria-label="Copy User ID" title="Copy User ID" ${x.record?.userId?'':'disabled'}>⧉</button></div></td>${canViewUltranetPassword()?`<td><div class="ultra-secret-cell"><span id="ultra-secret-${m.id}">${ultranetPasswordIds.has(Number(m.id))?'••••••••':'—'}</span><button class="btn ghost sm" type="button" onclick="event.stopPropagation();revealUltranetPassword(${m.id})" aria-label="Reveal Ultranet password" title="Show / hide password">◉</button><button class="btn ghost sm ultra-copy-btn" type="button" onclick="event.stopPropagation();copyUltranetPassword(${m.id})" aria-label="Copy Ultranet password" title="Copy Password" ${ultranetPasswordIds.has(Number(m.id))?'':'disabled'}>⧉</button></div></td>`:''}</tr>`;
+  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td><div class="ultra-secret-cell"><span>${esc(x.record?.userId||'—')}</span><button class="btn ghost sm ultra-copy-btn" type="button" onclick="event.stopPropagation();copyUltranetUserId(${m.id})" aria-label="Copy User ID" title="Copy User ID" ${x.record?.userId?'':'disabled'}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button></div></td>${canViewUltranetPassword()?`<td><div class="ultra-secret-cell"><span id="ultra-secret-${m.id}">${ultranetPasswordIds.has(Number(m.id))?'••••••••':'—'}</span><button class="btn ghost sm" type="button" onclick="event.stopPropagation();revealUltranetPassword(${m.id})" aria-label="Reveal Ultranet password" title="Show / hide password">◉</button><button class="btn ghost sm ultra-copy-btn" type="button" onclick="event.stopPropagation();copyUltranetPassword(${m.id})" aria-label="Copy Ultranet password" title="Copy Password" ${ultranetPasswordIds.has(Number(m.id))?'':'disabled'}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button></div></td>`:''}</tr>`;
  }).join('')||`<tr><td colspan="${count}" class="empty">No matching members</td></tr>`;
 }
 
@@ -2123,13 +2130,25 @@ async function revealUltranetPassword(memberId){
   ultranetRevealTimeouts.set(memberId,setTimeout(()=>{if(el.isConnected){el.textContent=ultranetPasswordIds.has(Number(memberId))?'••••••••':'—';el.dataset.visible='no'}},15000));
  }catch(err){if(el.isConnected)el.textContent='Unable to view';alert(err.message)}
 }
-async function writeUltranetClipboard(text,label){
- if(!text){notify('No '+label+' to copy.');return;}
+function writeUltranetClipboard(text,label){
+ // Copy silently without invoking the browser's Clipboard Permission dialog.
+ // We intentionally avoid navigator.clipboard.writeText, which can prompt on some browsers.
+ if(!text){notify('No '+label+' to copy.');return false;}
+ const active=document.activeElement;
+ const input=document.createElement('textarea');
+ input.value=String(text);
+ input.setAttribute('readonly','');
+ input.setAttribute('aria-hidden','true');
+ input.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none';
+ document.body.appendChild(input);
+ let copied=false;
  try{
-  if(!navigator.clipboard?.writeText)throw Error('Clipboard API unavailable');
-  await navigator.clipboard.writeText(String(text));
-  notify(label+' copied.');
- }catch(err){notify('Unable to copy '+label+'. Allow clipboard access and use HTTPS.');}
+  input.focus({preventScroll:true});input.select();input.setSelectionRange(0,input.value.length);
+  copied=!!document.execCommand('copy');
+ }catch(_error){copied=false;}
+ finally{input.remove();try{active?.focus?.({preventScroll:true})}catch(_){}}
+ notify(copied?label+' copied.':'Unable to copy '+label+' in this browser.');
+ return copied;
 }
 function copyUltranetUserId(memberId){
  const record=ultranetRecords.find(x=>Number(x.memberId)===Number(memberId));
@@ -3331,19 +3350,19 @@ async function exportUltranetPDF(){
   const filters=[byStatus,byRole,bySearch].filter(Boolean).join('  |  ');
   const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Ultranet - ${ultraPdfEscape(branch)}</title>
   <style>
-  @page{size:A4 landscape;margin:17mm 12mm 22mm 12mm}
+  @page{size:A4 landscape;margin:16mm 12mm 21mm 12mm}
   *{box-sizing:border-box}body{font:10px/1.4 Arial,Helvetica,sans-serif;color:#233147;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  h1{font-size:20px;color:#26365d;margin:0 0 4px;font-weight:750}
-  .report-top{border-bottom:3px solid #7969ca;padding-bottom:12px;margin-bottom:12px}
-  .subtitle{font-size:12px;font-weight:700;color:#6e56a6}.small{font-size:9px;color:#66738c;margin-top:6px}
+  h1{font-size:20px;color:#4455a7;margin:0 0 4px;font-weight:750}
+  .report-top{border-bottom:2px solid #7a86df;padding-bottom:11px;margin-bottom:12px}
+  .subtitle{font-size:12px;font-weight:700;color:#5867ca}.small{font-size:9px;color:#66738c;margin-top:6px}
   table{width:100%;border-collapse:collapse;table-layout:fixed}
   thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}
-  th,td{border:1px solid #899bb6;padding:7px 8px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
-  th{background:#e8e5fb;color:#283561;font-weight:700;font-size:10px}
-  tbody tr:nth-child(even) td{background:#f5f7fc}
-  .role-manager{background:#eaf1ff}.role-leader{background:#e5f7f7}.role-member{background:#fff2e5}
+  th,td{border:1px solid #c9d2e7;padding:7px 8px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
+  th{background:#eef0ff;color:#5263b9;font-weight:700;font-size:10px}
+  tbody tr:nth-child(even) td{background:#f7f9fd}
+  .role-manager{background:#eaf1ff!important;color:#396bb7}.role-leader{background:#e5f7f7!important;color:#168a91}.role-member{background:#fff2e5!important;color:#b97527}
   .inactive{color:#a43b4b;font-weight:700}.active{color:#1e7d65;font-weight:700}
-  .footer{position:fixed;bottom:-12mm;left:0;right:0;border-top:1px solid #b8c4d6;padding-top:6px;color:#68758e;font-size:9px;display:flex;justify-content:space-between}
+  .footer{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #dae1ef;padding-top:5px;color:#68758e;font-size:9px;display:flex;justify-content:space-between;break-inside:avoid;page-break-inside:avoid}
   .secret{font-family:Arial,Helvetica,sans-serif;white-space:pre-wrap}
   .no-print{margin-bottom:12px;font-size:12px;color:#4b5b77}
   @media print{.no-print{display:none}}
@@ -3354,7 +3373,7 @@ async function exportUltranetPDF(){
   <table><colgroup><col style="width:14%"><col style="width:22%"><col style="width:16%"><col style="width:10%"><col style="width:17%"><col style="width:21%"></colgroup>
   <thead><tr><th>Branch</th><th>Full Name</th><th>Role</th><th>Status</th><th>User ID</th><th>Password</th></tr></thead>
   <tbody>${rows.map(r=>`<tr><td>${ultraPdfEscape(r.branch)}</td><td><b>${ultraPdfEscape(r.name)}</b></td><td class="role-${r.role.includes('Manager')?'manager':r.role.includes('Leader')?'leader':'member'}">${ultraPdfEscape(r.role)}</td><td class="${r.status==='Active'?'active':'inactive'}">${ultraPdfEscape(r.status)}</td><td>${ultraPdfEscape(r.userId||'—')}</td><td class="secret">${ultraPdfEscape(r.password)}</td></tr>`).join('')}</tbody></table>
-  <div class="footer"><span>Exported By: ${ultraPdfEscape(exportUser)} &nbsp;|&nbsp; Exported Date &amp; Time: ${ultraPdfEscape(exported)} (MYT)</span><span>Confidential · Contains passwords</span></div>
+  <div class="footer"><span>${ultraPdfEscape(exportUser)} &nbsp;·&nbsp; ${ultraPdfEscape(exported)}</span><span>Confidential · Contains passwords</span></div>
   </body></html>`;
   if(printWindow.closed)throw Error('Export window was closed.');
   printWindow.document.open();printWindow.document.write(html);printWindow.document.close();
