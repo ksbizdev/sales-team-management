@@ -2922,4 +2922,99 @@ showRestoringShell=function(message='Restoring your session…',action=''){
   v79OldRestoringShell(message,action);
 };
 
+
+
+/* v80 — correct expired-token account directory; authoritative login history;
+   restore original Superadmin's encrypted Ultranet password controls. */
+const v80AdminDirectoryRequest=accountAdminRequest;
+accountAdminRequest=async function(payload){
+  if(salesAuthRefreshToken && (!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-45000)){
+    await renewSalesSession();
+  }
+  try{return await v80AdminDirectoryRequest(payload)}
+  catch(err){
+    // The account management Edge Function validates a fresh Auth JWT. Refresh
+    // once rather than leaving a permanent "Invalid session" banner.
+    if(/invalid session|session expired|jwt|authorization|unauthorized|token/i.test(String(err?.message||'')) && salesAuthRefreshToken){
+      await renewSalesSession();
+      return v80AdminDirectoryRequest(payload);
+    }
+    throw err;
+  }
+};
+
+// Restoring a session must also query the protected Ultranet permission RPC.
+// v79 restored workspace data but accidentally skipped that permission refresh.
+const v80OriginalRestore=restoreSalesSession;
+restoreSalesSession=async function(){
+  await v80OriginalRestore();
+  if(sessionUser==='admin'&&salesAuthAccessToken){
+    await refreshUltranetPermission();
+    if(page==='Ultranet'||(page==='Ultranet'&&modal==='ultranetEdit'))render();
+  }
+};
+// For the original primary administrator, the server-side role check recognizes
+// the primary account regardless of legacy Admin template permissions.
+const v80PreviousUltranetRefresh=refreshUltranetPermission;
+refreshUltranetPermission=async function(){
+  await v80PreviousUltranetRefresh();
+  if(page==='Ultranet'&&sessionUser==='admin')render();
+};
+
+// Login history never comes from shared workspace payload for scoped accounts.
+// Database RPC enforces primary Superadmin = all accounts; other roles = own only.
+let v80LoginHistoryRows=[],v80LoginHistoryLoading=false,v80LoginHistoryError='',v80LoginHistoryFetchedAt=0;
+async function v80RefreshLoginHistory(){
+  if(!salesAuthAccessToken||v80LoginHistoryLoading)return;
+  v80LoginHistoryLoading=true;
+  try{
+    const rows=await cloudRequest('/rest/v1/rpc/sales_list_login_history',{method:'POST',body:'{}'});
+    v80LoginHistoryRows=Array.isArray(rows)?rows:[];
+    v80LoginHistoryError='';v80LoginHistoryFetchedAt=Date.now();
+  }catch(e){
+    v80LoginHistoryError=String(e?.message||'Could not load login history');
+    console.warn('Login history error:',e);
+  }finally{
+    v80LoginHistoryLoading=false;
+    if(page==='Administration'&&adminTab==='Login History')render();
+  }
+}
+function v80HistoryRowsForDisplay(){
+  return v80LoginHistoryRows.map(h=>({
+    username:String(h.username||''),event:String(h.event||''),result:String(h.result||''),
+    time:h.created_at?new Date(h.created_at).toLocaleString('en-MY',{dateStyle:'medium',timeStyle:'medium'}):'—'
+  }));
+}
+loginHistory=function(){
+  if(!v80LoginHistoryLoading && salesAuthAccessToken && Date.now()-v80LoginHistoryFetchedAt>30000){
+    v80LoginHistoryFetchedAt=Date.now();
+    queueMicrotask(()=>{if(page==='Administration'&&adminTab==='Login History')v80RefreshLoginHistory()});
+  }
+  const records=v80HistoryRowsForDisplay();
+  const message=v80LoginHistoryLoading?'<div class="muted" style="margin:8px 0">Loading login history…</div>':
+   v80LoginHistoryError?'<div class="moto-error" style="margin:8px 0">'+esc(v80LoginHistoryError)+'</div>':'';
+  return `<div class="toolbar" style="justify-content:space-between"><h2>Login History</h2><button class="btn secondary sm" onclick="v80RefreshLoginHistory()">Refresh History</button></div>${message}<div class="tablewrap"><table><thead><tr><th>User ID</th><th>Event</th><th>Date & Time</th><th>Result</th></tr></thead><tbody>${records.map(h=>`<tr><td>${esc(h.username.toUpperCase())}</td><td>${esc(h.event)}</td><td>${esc(h.time)}</td><td>${esc(h.result)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No login records yet</td></tr>'}</tbody></table></div>`;
+};
+async function v80RecordAuthEvent(eventType){
+  if(!salesAuthAccessToken)return;
+  try{await cloudRequest('/rest/v1/rpc/sales_record_login',{method:'POST',body:JSON.stringify({p_event:eventType,p_result:'Success'})});
+    v80LoginHistoryFetchedAt=0;
+  }catch(e){console.warn('Could not record '+eventType+' history:',e)}
+}
+const v80OriginalLogin=login;
+login=async function(){
+  const wasLoggedIn=Boolean(sessionUser);
+  await v80OriginalLogin();
+  if(!wasLoggedIn&&sessionUser&&salesAuthAccessToken){
+    // Do not hold up the screen transition while writing an audit event.
+    v80RecordAuthEvent('Login');
+  }
+};
+const v80OriginalLogout=logout;
+logout=async function(){
+  if(sessionUser&&salesAuthAccessToken)await v80RecordAuthEvent('Logout');
+  v80LoginHistoryRows=[];v80LoginHistoryFetchedAt=0;
+  return v80OriginalLogout();
+};
+
 </script></body></html>
