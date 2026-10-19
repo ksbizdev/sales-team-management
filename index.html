@@ -2468,4 +2468,61 @@ saveAdminAccount=async function(){
  finally{if(btn&&btn.isConnected)btn.disabled=false}
 };
 
+
+
+/* v74: reliable authenticated Admin directory loading; never present a hard-coded
+   administrator-only row as a complete database result when the fetch has failed. */
+let adminDirectoryLastLoad=0;
+let adminDirectoryLastAttempt=0;
+let adminDirectoryError='';
+let adminDirectoryHasLoaded=false;
+let adminDirectoryScheduled=false;
+const _v74PriorUserManagement=userManagement;
+const _v74PriorFetchAccountDirectory=fetchAccountDirectory;
+fetchAccountDirectory=async function(){
+ if(!salesAuthAccessToken){adminDirectoryError='Sign in to load the account directory.';return;}
+ if(accountDirectoryLoading)return;
+ accountDirectoryLoading=true;
+ adminDirectoryLastAttempt=Date.now();
+ adminDirectoryError='';
+ try{
+  const data=await accountAdminRequest({action:'list'});
+  if(!Array.isArray(data.accounts))throw Error('Invalid account directory response');
+  adminAccountDirectory=data.accounts;
+  adminDirectoryHasLoaded=true;
+  adminDirectoryLastLoad=Date.now();
+ }catch(err){
+  adminDirectoryError=String(err?.message||'Unable to load Admin accounts');
+  console.warn('Admin account directory could not load:',err);
+ }finally{
+  accountDirectoryLoading=false;
+  if(page==='Administration'&&adminTab==='User Management'&&sessionUser)render();
+ }
+};
+function refreshAdminAccountDirectory(){
+ adminDirectoryLastLoad=0;
+ adminDirectoryLastAttempt=0;
+ adminDirectoryError='';
+ fetchAccountDirectory();
+ render();
+}
+userManagement=function(){
+ const needsRefresh=!!salesAuthAccessToken&&!accountDirectoryLoading&&!adminDirectoryScheduled&&(Date.now()-adminDirectoryLastAttempt>60000);
+ if(needsRefresh){
+  adminDirectoryScheduled=true;
+  queueMicrotask(()=>{adminDirectoryScheduled=false;if(page==='Administration'&&adminTab==='User Management')fetchAccountDirectory()});
+ }
+ const banner=accountDirectoryLoading?'<p class="muted" style="margin:6px 0 12px">Loading admin accounts from Supabase...</p>':
+ adminDirectoryError?'<p class="moto-error" style="margin:6px 0 12px">Unable to load all accounts: '+esc(adminDirectoryError)+' — Try Refresh Accounts.</p>':
+ !adminDirectoryHasLoaded?'<p class="muted" style="margin:6px 0 12px">Checking Supabase accounts...</p>':'';
+ const html=_v74PriorUserManagement();
+ return html.replace('<div class="user-category-tabs">',
+  '<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 0 10px"><button class="btn ghost sm" onclick="refreshAdminAccountDirectory()">↻ Refresh Accounts</button></div>'+banner+'<div class="user-category-tabs">');
+};
+const _v74PriorSelectUserCategory=selectUserCategory;
+selectUserCategory=function(value){
+ _v74PriorSelectUserCategory(value);
+ if(value==='Admin'&&(!adminDirectoryHasLoaded||Date.now()-adminDirectoryLastLoad>15000)&&!accountDirectoryLoading)fetchAccountDirectory();
+};
+
 </script></body></html>
