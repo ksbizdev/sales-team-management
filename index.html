@@ -1862,7 +1862,7 @@ function showRestoringShell(message='Restoring your session…', action=''){
 }
 async function retrySalesSession(){showRestoringShell();await restoreSalesSession()}
 function initializeSalesUI(){let saved=null;try{saved=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}if(saved?.refresh_token){showRestoringShell();restoreSalesSession();}else{render();}}
-initializeSalesUI();
+queueMicrotask(()=>initializeSalesUI());
 
 
 /* v62: Supabase-authenticated administrator appears in User Management; Superadmin is a
@@ -2524,5 +2524,115 @@ selectUserCategory=function(value){
  _v74PriorSelectUserCategory(value);
  if(value==='Admin'&&(!adminDirectoryHasLoaded||Date.now()-adminDirectoryLastLoad>15000)&&!accountDirectoryLoading)fetchAccountDirectory();
 };
+
+
+/* v75: User-ID authenticated login for Admin and Salesperson. All non-primary sessions
+   load a service-filtered read-only snapshot. Server RLS blocks direct workspace access. */
+let salesRestrictedProfile=null;
+const salesRestricted=()=>Boolean(salesRestrictedProfile&&sessionUser!=='admin');
+async function salesSessionRequest(action,details={},token=null){
+ const resp=await fetch(SALES_AUTH_URL+'/functions/v1/sales-session',{
+  method:'POST',headers:{apikey:SALES_AUTH_KEY,'Content-Type':'application/json',...(token||salesAuthAccessToken?{'Authorization':'Bearer '+(token||salesAuthAccessToken)}:{})},
+  body:JSON.stringify({action,...details})});
+ let data={};try{data=await resp.json()}catch(e){}
+ if(!resp.ok)throw Error(data.error||'Login service failed ('+resp.status+')');
+ return data;
+}
+async function loadRestrictedSession(){
+ const snap=await salesSessionRequest('snapshot');
+ const me=snap.profile;
+ if(!me||!me.username)throw Error('Account profile missing.');
+ salesRestrictedProfile=me;
+ role='Admin'; // Legacy rendering role; real access follows verified permission matrix below.
+ actor=0;
+ cloudApply(snap.payload);
+ cloudVersion=Number(snap.version||0);cloudReady=false;cloudDirty=false;
+ sessionUser='user:'+me.username;
+ branchFilter='All';ultranetBranch='All';page='Dashboard';modal='';
+ if(!hasModule(page))page=['Team Management','Ultranet','Activity History','Administration'].find(x=>hasModule(x))||'Dashboard';
+ restoreSalesView();
+ if(!hasModule(page))page='Dashboard';
+ await refreshUltranetPermission();
+ render();
+}
+const v75OriginalLogin=login;
+login=async function(){
+ const username=($('loginUsername')?.value||'').trim();
+ if(username.toLowerCase()==='admin')return v75OriginalLogin();
+ const password=$('loginPassword')?.value||'';
+ const error=$('loginError'),button=$('loginButton');
+ if(!username||!password){if(error)error.textContent='Enter User ID and Password.';return}
+ if(button)button.disabled=true;
+ try{
+  const data=await salesSessionRequest('login',{username,password});
+  salesAuthAccessToken=data.session?.access_token;
+  salesAuthRefreshToken=data.session?.refresh_token;
+  salesAuthExpiresAt=Date.now()+Math.max(30,Number(data.session?.expires_in||3600))*1000;
+  if(!salesAuthAccessToken||!salesAuthRefreshToken)throw Error('Authentication session missing.');
+  await loadRestrictedSession();saveSalesSession();
+ }catch(e){salesAuthAccessToken=null;salesAuthRefreshToken=null;salesRestrictedProfile=null;clearSalesSession();
+  if(error)error.textContent=String(e.message||'Unable to sign in.');}
+ finally{if(button)button.disabled=false}
+};
+const v75OriginalRestore=restoreSalesSession;
+restoreSalesSession=async function(){
+ let stored=null;try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}
+ if(!stored?.refresh_token)return;
+ salesAuthRefreshToken=stored.refresh_token;salesAuthAccessToken=stored.access_token||null;
+ salesAuthExpiresAt=Number(stored.expires_at||0);
+ try{
+  if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();
+  const info=await salesSessionRequest('me');
+  if(info.primary){salesRestrictedProfile=null;return await v75OriginalRestore();}
+  await loadRestrictedSession();saveSalesSession();
+ }catch(e){console.warn('Session restore failed:',e);salesRestrictedProfile=null;
+  if(/network|fetch|connection/i.test(String(e.message))){showRestoringShell('Unable to connect. Your session remains saved.','Retry connection');}
+  else{salesAuthAccessToken=null;salesAuthRefreshToken=null;clearSalesSession();sessionUser=null;render();}}
+};
+const v75PriorLogout=logout;
+logout=async function(){salesRestrictedProfile=null;return v75PriorLogout()};
+const v75HasModule=hasModule,v75CanAction=canAction,v75AssignedScope=assignedBranchAccess,v75Visible=visible;
+hasModule=function(m){if(!salesRestricted())return v75HasModule(m);return (salesRestrictedProfile.permissions?.[m]||[]).includes('View')};
+canAction=function(m,a){if(!salesRestricted())return v75CanAction(m,a);return a==='View'&&hasModule(m)};
+assignedBranchAccess=function(moduleName){if(!salesRestricted())return v75AssignedScope(moduleName);return salesRestrictedProfile.branches||[]};
+visible=function(){if(!salesRestricted())return v75Visible();return people};
+const v75CurrentName=currentUserName;
+currentUserName=function(){return salesRestricted()?String(salesRestrictedProfile.full_name||salesRestrictedProfile.username):v75CurrentName()};
+const v75CloudSchedule=cloudSchedule;
+cloudSchedule=function(){if(salesRestricted())return false;return v75CloudSchedule()};
+const v75Render=render;
+render=function(){v75Render();if(!salesRestricted())return;
+ const header=document.querySelector('header.top .toolbar span.muted');if(header)header.textContent=salesRestrictedProfile.username;
+ const main=document.querySelector('main.main');if(main){const content=main.querySelector('#content');if(content){
+  content.insertAdjacentHTML('afterbegin','<div class="cloud-banner" role="status">Read-only access · '+esc(salesRestrictedProfile.username)+' · '+esc((salesRestrictedProfile.branches||[]).join(', ')||'No branch assigned')+'. Actions that change records are disabled while per-user write access is being finalized.</div>');
+  content.querySelectorAll('button[onclick]').forEach(btn=>{
+   const call=btn.getAttribute('onclick')||'';
+   if(/(?:add|save|delete|remove|edit|create|transfer|changeStatus|setStatus|toggleStatus|upload|export|duplicate|archive|approve|complete|resetPassword|updatePayment|cancelRequest)\s*\(/i.test(call)){
+    btn.disabled=true;btn.title='Read-only account: changes are not enabled.';
+   }
+  });
+ }}
+};
+
+/* Extra guard for modal actions in restricted preview sessions. */
+const v75PreviousUltranetPermission=refreshUltranetPermission;
+refreshUltranetPermission=async function(){
+ if(salesRestricted()){
+  ultranetServerPermission=false;
+  ultranetPasswordIds.clear();
+  return;
+ }
+ return v75PreviousUltranetPermission();
+};
+document.addEventListener('click',function(event){
+ if(!salesRestricted())return;
+ const control=event.target.closest('button,[onclick]');
+ if(!control)return;
+ const code=control.getAttribute('onclick')||'';
+ if(/(?:add|save|delete|remove|edit|create|transfer|changeStatus|setStatus|toggleStatus|upload|export|duplicate|archive|approve|complete|resetPassword|updatePayment|cancelRequest)\s*\(/i.test(code)){
+  event.preventDefault();event.stopImmediatePropagation();
+  if(typeof notify==='function')notify('Read-only access. Editing is not enabled for this account yet.');
+ }
+},true);
 
 </script></body></html>
