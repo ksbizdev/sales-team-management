@@ -2855,4 +2855,71 @@ document.addEventListener('keydown',function(e){
  if(typeof handleLoginClick==='function')handleLoginClick();
 },true);
 
+
+/* v79 — uppercase account IDs and reliable mobile session/view restoration. */
+const v79DirectoryRows=userDirectoryRows;
+userDirectoryRows=function(){
+  const html=v79DirectoryRows();
+  // User ID is always column 2 in User Management. Only change presentation.
+  return html.replace(/(<tr\b[^>]*>[\s\S]*?<\/td>\s*<td(?:\s[^>]*)?>)([\s\S]*?)(<\/td>)/g,(_whole,before,cell,after)=>before+cell.replace(/(^|>)([^<>]+)(?=<|$)/g,(_m,prefix,s)=>prefix+s.toUpperCase())+after);
+};
+const v79ExistingRemember=rememberSalesView;
+rememberSalesView=function(){
+  v79ExistingRemember();
+  try{const data=localStorage.getItem(SALES_VIEW_KEY);if(data)sessionStorage.setItem(SALES_VIEW_KEY,data);}catch(e){}
+};
+const v79ExistingRestoreView=restoreSalesView;
+restoreSalesView=function(){
+  try{
+    const sessionCopy=sessionStorage.getItem(SALES_VIEW_KEY);
+    const localCopy=localStorage.getItem(SALES_VIEW_KEY);
+    if(!localCopy&&sessionCopy)localStorage.setItem(SALES_VIEW_KEY,sessionCopy);
+  }catch(e){}
+  v79ExistingRestoreView();
+};
+// A temporary network failure must not clear valid locally retained refresh credentials.
+restoreSalesSession=async function(){
+  let stored=null;
+  try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}
+  if(!stored?.refresh_token){render();return;}
+  salesAuthRefreshToken=stored.refresh_token;
+  salesAuthAccessToken=stored.access_token||null;
+  salesAuthExpiresAt=Number(stored.expires_at||0);
+  showRestoringShell('Restoring your session…');
+  try{
+    if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();
+    const info=await salesSessionRequest('me');
+    if(info.primary){
+      salesRestrictedProfile=null;
+      await loadCloudWorkspace();
+      sessionUser='admin';role='Admin';actor=0;
+      restoreSalesView();
+      startCloudPolling();
+      saveSalesSession();render();
+      if(typeof fetchAccountDirectory==='function')fetchAccountDirectory();
+    }else{
+      await loadRestrictedSession();
+      saveSalesSession();
+    }
+  }catch(e){
+    console.warn('v79 session restore did not complete:',e);
+    // Keep the same app shell and stored token for explicit retry; no Login flash.
+    showRestoringShell('Could not restore your session. Check your connection and retry.','Retry connection');
+  }
+};
+initializeSalesUI=function(){
+  let stored=null;
+  try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}
+  if(stored?.refresh_token){showRestoringShell('Restoring your session…');restoreSalesSession();}
+  else render();
+};
+const v79OldRestoringShell=showRestoringShell;
+showRestoringShell=function(message='Restoring your session…',action=''){
+  try{if(!localStorage.getItem(SALES_VIEW_KEY)){
+    const val=sessionStorage.getItem(SALES_VIEW_KEY);
+    if(val)localStorage.setItem(SALES_VIEW_KEY,val);
+  }}catch(e){}
+  v79OldRestoringShell(message,action);
+};
+
 </script></body></html>
