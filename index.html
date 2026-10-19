@@ -1174,6 +1174,18 @@ body.starlight .ultra-copy-btn,body.dark .ultra-copy-btn{background:#263258!impo
 .ultranet-manager-option span{display:grid;gap:3px}.ultranet-manager-option strong{font-size:13px}.ultranet-manager-option small{font-size:11px;opacity:.75}
 .ultranet-export-actions{justify-content:flex-end;margin-top:20px}
 .dark .ultranet-manager-option:has(input:checked){background:#263863;color:#f0f4ff}
+
+/* v92 — consistent User Management action icons and Team PDF export */
+.v92-user-action{display:inline-flex;align-items:center;justify-content:center;width:34px;height:33px;border:1px solid #d8dff0;border-radius:11px;background:#f0f2ff;color:#5264b7;cursor:pointer;transition:transform .18s,background .18s,box-shadow .18s;margin-right:6px;padding:0}
+.v92-user-action:hover:not(:disabled){transform:translateY(-2px);background:#e5e9ff;box-shadow:0 5px 13px rgba(70,88,158,.14)}
+.v92-user-action.delete{background:#fff2f3;border-color:#f3d5d9;color:#c24a63}
+.v92-user-action.delete:hover:not(:disabled){background:#ffe6e9}
+.v92-user-action:disabled{opacity:.3;cursor:not-allowed}
+.v92-user-action svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.v92-user-actions{display:flex;align-items:center;gap:2px;white-space:nowrap}
+.v92-pdf-btn{margin-left:7px}
+@media(max-width:640px){.v92-user-action{min-width:32px;width:32px}.v92-pdf-btn{margin-left:3px}}
+
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -3483,6 +3495,115 @@ login=async function(){
     v90FreshLogin=false;
     if(button)button.disabled=false;
   }
+};
+
+
+/* v92 — Team PDF / account action icons / paired Login History. */
+const v92TeamBefore=team;
+team=function(){
+  let html=v92TeamBefore();
+  if(view==='List'&&canAction('Team Management','Export')){
+    const marker='</div></div><div class="branch-tabs-shell">';
+    const button='<button class="btn secondary sm v92-pdf-btn" type="button" onclick="v92ExportTeamPDF()">⇩ Export PDF</button>';
+    if(html.includes(marker))html=html.replace(marker,button+marker);
+  }
+  return html;
+};
+function v92PDFTime(d){return d.toLocaleString('en-GB',{timeZone:'Asia/Kuala_Lumpur',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})}
+function v92ExportTeamPDF(){
+ if(!canAction('Team Management','Export')||!hasModule('Team Management'))return notify('Team Management Export permission required.');
+ // Export exactly the current branch/tab + table filters; sorting matches the listing.
+ const rows=sortRows(filtered());
+ if(!rows.length)return notify('No matching members to export.');
+ const win=window.open('','_blank');
+ if(!win)return notify('Please allow the print window for Export PDF.');
+ const selectedBranch=branchFilter==='All'?'All Branches':branchFilter;
+ const username=(typeof currentLoginUserId==='function'?currentLoginUserId():String(sessionUser||'admin')).toUpperCase();
+ const when=v92PDFTime(new Date());
+ const meta=[statusFilter!=='All'?'Status: '+statusFilter:'',roleFilter!=='All'?'Role: '+roleFilter:'',search?'Search: '+search:''].filter(Boolean).join(' · ');
+ let previous='';
+ const body=rows.map(p=>{
+   const group=memberGroup(p),groupKey=String(group.managerId||0)+':'+String(group.leaderId||0);
+   const isLeader=!!group.leaderId;
+   const separator=previous===groupKey?'':`<tr class="group ${isLeader?'leader-group':'manager-group'}"><td colspan="5">${esc((isLeader?group.leaderName:group.managerName)||'Unassigned')} · ${isLeader?'Sales Team Leader':'Sales Manager'}</td></tr>`;
+   previous=groupKey;
+   const roleClass=p.role==='Manager'?'manager':p.role==='Leader'?'leader':'member';
+   const roleLabel=p.role==='Manager'?'Sales Manager':p.role==='Leader'?'Sales Team Leader':'Sales Advisor';
+   return separator+`<tr><td>${esc(memberBranchText(p))}</td><td><strong>${esc(p.name)}</strong></td><td>${esc(p.ic||'—')}</td><td><span class="role-pill ${roleClass}">${esc(roleLabel)}</span></td><td><span class="status ${p.status==='Active'?'on':'off'}">${esc(p.status)}</span></td></tr>`;
+ }).join('');
+ const report=`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Team Management - ${esc(selectedBranch)}</title><style>
+ @page{size:A4 landscape;margin:17mm 12mm 20mm 12mm}
+ *{box-sizing:border-box}html,body{margin:0}body{background:#fff;color:#26324a;font:10px/1.45 Arial,Helvetica,sans-serif;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .heading{border-bottom:2px solid #8790dc;padding-bottom:11px;margin-bottom:12px}h1{font-size:20px;color:#4557ad;margin:0 0 4px} .branch{font-size:12px;font-weight:700;color:#596ac5}.meta{font-size:9px;color:#69758b;margin-top:5px}
+ table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:1px solid #ccd5ea;padding:7px 9px;text-align:left;vertical-align:middle;overflow-wrap:anywhere}th{background:#eef0ff;color:#5465b4;font-weight:750}tbody tr:nth-child(even):not(.group) td{background:#f9faff}
+ .group{break-after:avoid;page-break-after:avoid}.manager-group td{background:#e7ebff!important;color:#4054a8;font-weight:750;padding:8px}.leader-group td{background:#e1f5f0!important;color:#087e78;font-weight:750;padding:8px}
+ .role-pill{display:inline-block;border-radius:999px;padding:3px 9px;font-size:9px;font-weight:700;white-space:nowrap}.role-pill.manager{background:#e8ecff;color:#4d5cbc}.role-pill.leader{background:#dff7f3;color:#087e77}.role-pill.member{background:#ffedd9;color:#aa6b13}.status{font-weight:700}.status.on{color:#168469}.status.off{color:#b04458}
+ footer{position:fixed;left:0;right:0;bottom:0;border-top:1px solid #dbe2f1;background:#fff;padding-top:5px;color:#68748b;font-size:9px;display:flex;justify-content:space-between} .screen-hint{font-size:12px;margin-bottom:12px;color:#667;}@media print{.screen-hint{display:none}}
+ </style></head><body><div class="screen-hint">Choose Save as PDF in the print dialog.</div><header class="heading"><h1>Team Management</h1><div class="branch">Branch: ${esc(selectedBranch)}</div><div class="meta">${esc(meta)}${meta?' · ':''}${rows.length} member${rows.length===1?'':'s'}</div></header>
+ <table><colgroup><col style="width:18%"><col style="width:29%"><col style="width:20%"><col style="width:20%"><col style="width:13%"></colgroup><thead><tr><th>Branch</th><th>Full Name</th><th>IC No.</th><th>Role</th><th>Status</th></tr></thead><tbody>${body}</tbody></table>
+ <footer><span>${esc(username)} &nbsp;·&nbsp; ${esc(when)}</span><span>© 2026 Keat Seng Motor Sdn Bhd. All rights reserved.</span></footer></body></html>`;
+ win.document.open();win.document.write(report);win.document.close();win.focus();
+ win.setTimeout(()=>{try{win.print()}catch(e){console.warn('PDF print unavailable',e)}},250);
+}
+function v92ActionIcon(kind){
+ if(kind==='delete')return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 4h4m-8 3 1 13h10l1-13M10 11v6m4-6v6"/></svg>';
+ if(kind==='add')return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+ return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17-.5 3.5L7 20l11.5-11.5-3-3L4 17Zm9-10 3 3"/></svg>';
+}
+userDirectoryRows=function(){
+ let list=[];
+ if(accountCategory==='Admin'){
+   list.push({id:'root',name:'Administrator',username:'admin',role:'Superadmin',branch:'All Branches',state:'Enabled',kind:'Admin',primary:true});
+   for(const a of adminAccountDirectory.filter(a=>a.category==='Admin'&&String(a.username).toLowerCase()!=='admin'))list.push({id:a.id,name:a.full_name,username:a.username,role:a.role||'Admin',branch:(a.branches||[]).join(', ')||'—',state:a.enabled?'Enabled':'Disabled',kind:'Admin',primary:false});
+ }else{
+   list=people.map(p=>{const account=adminAccountDirectory.find(a=>a.category==='Salesperson'&&Number(a.member_id)===Number(p.id));return {id:p.id,name:p.name,username:linkedUltranetId(p.id)||'Not assigned',role:p.role,branch:memberBranchText(p),state:account?(account.enabled?'Enabled':'Disabled'):'Not created',kind:'Salesperson',account,primary:false};});
+ }
+ const kw=accountDirectoryQuery.toLowerCase().trim();
+ if(kw)list=list.filter(a=>[a.name,a.username,a.role,a.branch,a.state].some(x=>String(x||'').toLowerCase().includes(kw)));
+ return list.map(a=>{
+   const accountId=a.kind==='Salesperson'?a.account?.id:a.id;
+   const editHandler=a.kind==='Admin'?(a.primary?'openAuthenticatedAdminDetails()':`openV73AdminEditor('${esc(a.id)}')`):`openSalespersonAccount(${Number(a.id)})`;
+   const editButton=`<button type="button" class="v92-user-action" title="${a.primary?'View Account':a.account?'Edit Account':'Create Login Account'}" aria-label="${a.primary?'View Account':'Edit Account'}" onclick="${editHandler}">${v92ActionIcon(a.account||a.kind==='Admin'?'edit':'add')}</button>`;
+   const isSelf=String(a.username||'').toLowerCase()===String(sessionUser||'').toLowerCase();
+   const allowDelete=!!accountId&&!a.primary&&!isSelf&&canAction('Administration','Delete');
+   const delButton=`<button type="button" class="v92-user-action delete" title="${allowDelete?'Delete Login Account':'Cannot delete this account'}" aria-label="Delete Login Account" ${allowDelete?`data-account-id="${esc(accountId)}" data-account-name="${esc(a.username)}" onclick="v92DeleteUserClick(this)"`:'disabled'}>${v92ActionIcon('delete')}</button>`;
+   return `<tr><td><strong>${esc(a.name)}</strong></td><td>${esc(String(a.username||'').toUpperCase())}</td><td>${salesRoleBadge(a.role)}</td><td>${esc(a.branch)}</td><td><span class="pill ${a.state==='Enabled'?'':'off'}">${esc(a.state)}</span></td><td><div class="v92-user-actions">${editButton}${delButton}</div></td></tr>`;
+ }).join('')||'<tr><td colspan="6" class="empty">No matching users</td></tr>';
+};
+const v92PrevUserManagement=userManagement;
+userManagement=function(){return v92PrevUserManagement().replace('<th>Details</th>','<th>Action</th>')};
+async function v92DeleteUserClick(button){
+ const id=button?.dataset?.accountId,username=button?.dataset?.accountName;
+ if(!id||!canAction('Administration','Delete'))return notify('Delete permission required.');
+ if(String(username).toLowerCase()==='admin')return notify('Primary Superadmin cannot be deleted.');
+ if(!window.confirm('Delete the login account '+String(username).toUpperCase()+'?\n\nThis removes its system login only. Team Management member data will be kept.'))return;
+ button.disabled=true;
+ try{
+   await accountAdminRequest({action:'delete_user',user_id:id});
+   adminAccountDirectory=adminAccountDirectory.filter(a=>a.id!==id);
+   adminDirectoryLastLoad=0;
+   if(typeof fetchAccountDirectory==='function')await fetchAccountDirectory();
+   render();
+ }catch(err){button.disabled=false;notify('Could not delete account: '+String(err?.message||err))}
+}
+// Display paired logins (one row per Login) from a permission-scoped Supabase RPC.
+async function v92RefreshLoginHistory(){
+ if(!salesAuthAccessToken||v80LoginHistoryLoading)return;
+ v80LoginHistoryLoading=true;v80LoginHistoryError='';
+ try{
+  const rows=await cloudRequest('/rest/v1/rpc/sales_login_sessions',{method:'POST',body:'{}'});
+  v80LoginHistoryRows=Array.isArray(rows)?rows:[];
+  v80LoginHistoryFetchedAt=Date.now();
+ }catch(err){v80LoginHistoryError=String(err?.message||'Could not load login history')}
+ finally{v80LoginHistoryLoading=false;if(page==='Administration'&&adminTab==='Login History')render()}
+}
+v80RefreshLoginHistory=v92RefreshLoginHistory;
+function v92HistoryDate(value){if(!value)return '—';const date=new Date(value);return isNaN(date.getTime())?'—':v92PDFTime(date)}
+loginHistory=function(){
+ if(!v80LoginHistoryLoading&&salesAuthAccessToken&&Date.now()-v80LoginHistoryFetchedAt>30000){v80LoginHistoryFetchedAt=Date.now();queueMicrotask(()=>{if(page==='Administration'&&adminTab==='Login History')v92RefreshLoginHistory()})}
+ const note=v80LoginHistoryLoading?'<div class="muted" style="margin:8px 0">Loading login history…</div>':v80LoginHistoryError?'<div class="moto-error" style="margin:8px 0">'+esc(v80LoginHistoryError)+'</div>':'';
+ const rows=v80LoginHistoryRows.map(h=>`<tr><td><strong>${esc(String(h.user_id||'').toUpperCase())}</strong></td><td>${esc(v92HistoryDate(h.login_at))}</td><td>${esc(v92HistoryDate(h.logout_at))}</td><td>${esc(h.result||'—')}</td><td>${esc(h.ip_address||'—')}</td></tr>`).join('');
+ return `<div class="toolbar" style="justify-content:space-between"><h2>Login History</h2><button class="btn secondary sm" onclick="v92RefreshLoginHistory()">Refresh History</button></div>${note}<div class="tablewrap"><table><thead><tr><th>User ID</th><th>Login Date &amp; Time</th><th>Logout Date &amp; Time</th><th>Result</th><th>IP Address</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="empty">No login records yet</td></tr>'}</tbody></table></div>`;
 };
 
 </script></body></html>
