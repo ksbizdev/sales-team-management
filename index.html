@@ -1160,6 +1160,20 @@ body.starlight .ultra-copy-btn,body.dark .ultra-copy-btn{background:#263258!impo
 .ultranet-copy-toast{position:fixed;right:22px;bottom:26px;z-index:99999;pointer-events:none;background:#242e49;color:#fff;border-radius:12px;padding:9px 17px;font-size:13px;font-weight:650;box-shadow:0 10px 34px rgba(20,34,70,.22);opacity:0;transform:translateY(10px);transition:opacity .18s,transform .18s}
 .ultranet-copy-toast.show{opacity:1;transform:translateY(0)}.ultranet-copy-toast.failure{background:#a93448}
 @media(max-width:650px){.ultranet-copy-toast{right:14px;bottom:95px}}
+
+/* v89: Export manager picker, only for branches with multiple Managers. */
+.ultranet-export-overlay{position:fixed;inset:0;background:#0d173e82;z-index:1500;display:flex;align-items:center;justify-content:center;padding:20px}
+.ultranet-export-dialog{width:min(530px,100%);max-height:85vh;overflow:auto;background:var(--panel,#fff);border:1px solid #dae1f0;border-radius:20px;box-shadow:0 24px 70px #0b163f44;padding:24px;color:var(--text,#26344d)}
+.ultranet-export-heading,.ultranet-export-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ultranet-export-heading h2{margin:0;font-size:19px}
+.ultranet-export-dialog .muted{margin:13px 0;line-height:1.5}
+.ultranet-manager-options{display:flex;flex-direction:column;gap:9px;max-height:50vh;overflow-y:auto;padding:2px}
+.ultranet-manager-option{display:flex;gap:13px;align-items:center;padding:13px;border:1px solid #dce3f3;border-radius:12px;cursor:pointer;background:var(--panel,#fff)}
+.ultranet-manager-option:has(input:checked){border-color:#7483df;background:#eef0ff;color:#26376e}
+.ultranet-manager-option input{width:17px;height:17px;flex:none;accent-color:#6675d9}
+.ultranet-manager-option span{display:grid;gap:3px}.ultranet-manager-option strong{font-size:13px}.ultranet-manager-option small{font-size:11px;opacity:.75}
+.ultranet-export-actions{justify-content:flex-end;margin-top:20px}
+.dark .ultranet-manager-option:has(input:checked){background:#263863;color:#f0f4ff}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1700,7 +1714,7 @@ function ultranetData(){
 function ultranet(){
  const branchesForTabs=['All',...branches],rows=ultranetData();
  const cols=[['branch','Branch'],['name','Full Name'],['role','Role'],['status','Status'],['userId','User ID'],...(canViewUltranetPassword()?[['password','Password']]:[])];
- return `<div class="card"><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select>${ultranetCanExportPasswords()?`<button class="btn secondary sm ultranet-export-inline" type="button" onclick="exportUltranetPDF()">⇩ Export PDF</button>`:canAction('Ultranet','Export')?`<span class="muted" title="Exporting passwords also requires View Password permission">PDF with passwords requires View Password permission</span>`:''}</div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
+ return `<div class="card"><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select>${ultranetCanExportPasswords()?`<button class="btn secondary sm ultranet-export-inline" type="button" onclick="startUltranetPDFExport()">⇩ Export PDF</button>`:canAction('Ultranet','Export')?`<span class="muted" title="Exporting passwords also requires View Password permission">PDF with passwords requires View Password permission</span>`:''}</div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
 }
 function ultranetRowsHTML(rows){
  let previousGroup='';
@@ -3324,15 +3338,45 @@ function ultraPdfDateTime(date){
   hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true
  }).format(date).replace(',', '');
 }
-async function exportUltranetPDF(){
+/* v89: Select one manager's entire reporting tree when a branch has multiple managers. */
+function ultranetExportManagers(){
+ if(ultranetBranch==='All')return [];
+ const source=role==='Admin'?people:visible();
+ const filtered=source.filter(p=>p.role==='Manager'&&memberInBranch(p,ultranetBranch));
+ return [...new Map(filtered.map(m=>[Number(m.id),m])).values()].sort((a,b)=>a.name.localeCompare(b.name));
+}
+function startUltranetPDFExport(){
+ if(!ultranetCanExportPasswords())return notify('Export and View Password permissions are required.');
+ const managers=ultranetExportManagers();
+ if(managers.length<2)return exportUltranetPDF(null);
+ document.querySelector('#ultranet-manager-export-picker')?.remove();
+ const layer=document.createElement('div');
+ layer.id='ultranet-manager-export-picker';
+ layer.className='ultranet-export-overlay';
+ const options=[`<label class="ultranet-manager-option"><input type="radio" name="ultranet-pdf-manager" value="all" checked><span><strong>Entire Branch</strong><small>Export all matching users in ${ultraPdfEscape(ultranetBranch)}</small></span></label>`,...managers.map(m=>`<label class="ultranet-manager-option"><input type="radio" name="ultranet-pdf-manager" value="${Number(m.id)}"><span><strong>${ultraPdfEscape(m.name)}</strong><small>Manager · ${ultraPdfEscape(ultranetBranch)} · Include reporting Leaders and Members</small></span></label>`)].join('');
+ layer.innerHTML=`<section class="ultranet-export-dialog" role="dialog" aria-modal="true" aria-labelledby="ultranet-export-heading"><div class="ultranet-export-heading"><h2 id="ultranet-export-heading">Export Ultranet PDF</h2><button type="button" class="btn ghost sm" aria-label="Close" data-close>✕</button></div><p class="muted">Select whose team to export. Current branch, status, role, search and table filters still apply.</p><div class="ultranet-manager-options">${options}</div><div class="ultranet-export-actions"><button type="button" class="btn secondary" data-close>Cancel</button><button type="button" class="btn" data-export>Continue to PDF</button></div></section>`;
+ layer.addEventListener('click',event=>{
+  if(event.target===layer||event.target.closest('[data-close]')){layer.remove();return;}
+  if(event.target.closest('[data-export]')){
+   const picked=layer.querySelector('input[name="ultranet-pdf-manager"]:checked')?.value||'all';
+   const managerId=picked==='all'?null:Number(picked);
+   layer.remove();exportUltranetPDF(managerId);
+  }
+ });
+ document.body.appendChild(layer);
+ layer.querySelector('[data-close]')?.focus();
+}
+async function exportUltranetPDF(chosenManagerId=null){
  if(!ultranetCanExportPasswords())return notify('Export and View Password permissions are required to export Ultranet passwords.');
- const rows=ultranetData().map(({member,record})=>({
+ const manager=chosenManagerId===null?null:ultranetExportManagers().find(m=>Number(m.id)===Number(chosenManagerId));
+ if(chosenManagerId!==null&&!manager)return notify('Selected Manager is no longer available in this branch. Please try again.');
+ const rows=ultranetData().filter(({member})=>!manager||Number(memberGroup(member).managerId)===Number(manager.id)).map(({member,record})=>({
   memberId:Number(member.id), branch:memberBranchText(member),name:member.name,
   rawRole:member.role,group:memberGroup(member),
   role:({Manager:'Sales Manager',Leader:'Sales Team Leader',Member:'Sales Advisor'}[member.role]||member.role),
   status:member.status,userId:record?.userId||'',password:''
  }));
- if(!rows.length)return notify('No matching Ultranet records to export.');
+ if(!rows.length)return notify('No matching Ultranet records for the selected Manager and filters.');
  // Open synchronously from the click to avoid popup blockers after asynchronous password reads.
  const printWindow=window.open('','_blank');
  if(!printWindow)return notify('Allow pop-ups to export the PDF, then try again.');
@@ -3359,10 +3403,11 @@ async function exportUltranetPDF(){
   const branch=ultranetBranch==='All'?'All Branches':ultranetBranch;
   const exportUser=(typeof currentLoginUserId==='function'?currentLoginUserId():sessionUser==='admin'?'ADMIN':String(sessionUser||'')).toUpperCase();
   const exported=ultraPdfDateTime(new Date());
+  const selectedManagerLabel=manager?'Manager: '+manager.name:'';
   const byStatus=ultranetStatus!=='All'?'Status: '+ultranetStatus:'';
   const byRole=ultranetRole!=='All'?'Role: '+ultranetRole:'';
   const bySearch=ultranetTerm?'Search: '+ultranetTerm:'';
-  const filters=[byStatus,byRole,bySearch].filter(Boolean).join('  |  ');
+  const filters=[selectedManagerLabel,byStatus,byRole,bySearch].filter(Boolean).join('  |  ');
   const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Ultranet - ${ultraPdfEscape(branch)}</title>
   <style>
   @page{size:A4 landscape;margin:16mm 12mm 21mm 12mm}
