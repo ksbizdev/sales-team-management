@@ -976,6 +976,31 @@ html.hierarchy-document-scroll body .hier-horizontal-bar{display:none!important}
 .dark .sales-person-option:hover{background:#283c68;color:#fff}
 @media(max-width:900px){html.hierarchy-document-scroll body .side,body.hierarchy-page-scroll .side{width:72px!important;flex-basis:72px!important}.hierarchy-page-rail{left:72px}}
 @media(max-width:520px){html.hierarchy-document-scroll body .side,body.hierarchy-page-scroll .side{width:56px!important;flex-basis:56px!important}.hierarchy-page-rail{left:56px}}
+
+/* v70: constrain the flex layout to the viewport rather than the chart's min-content width. */
+html.hierarchy-document-scroll,html.hierarchy-document-scroll body{width:100vw!important;max-width:100vw!important;overflow-x:hidden!important}
+html.hierarchy-document-scroll body #root{width:100vw!important;max-width:100vw!important;min-width:0!important;overflow-x:hidden!important}
+html.hierarchy-document-scroll body .app{width:100vw!important;max-width:100vw!important;min-width:0!important;overflow-x:hidden!important}
+html.hierarchy-document-scroll body .main{width:calc(100vw - 245px)!important;max-width:calc(100vw - 245px)!important;min-width:0!important;flex:0 0 calc(100vw - 245px)!important;overflow:hidden!important}
+html.hierarchy-document-scroll body .main #content,html.hierarchy-document-scroll body .main #content>.card{min-width:0!important;max-width:100%!important;overflow:hidden!important}
+html.hierarchy-document-scroll body .new-hier,html.hierarchy-document-scroll body .hier-team{min-width:0!important;max-width:100%!important;overflow:hidden!important}
+@media(max-width:900px){html.hierarchy-document-scroll body .main{width:calc(100vw - 72px)!important;max-width:calc(100vw - 72px)!important;flex-basis:calc(100vw - 72px)!important}}
+@media(max-width:520px){html.hierarchy-document-scroll body .main{width:calc(100vw - 56px)!important;max-width:calc(100vw - 56px)!important;flex-basis:calc(100vw - 56px)!important}}
+/* v70: persistent bottom page rail; left edge starts after the fixed sidebar. */
+.hierarchy-page-rail{display:block!important;box-sizing:border-box!important;height:27px!important;padding:2px 12px 4px!important;overflow:hidden!important}
+.hierarchy-page-rail .rail-scroll{height:21px!important;min-width:0!important;overflow-x:scroll!important;overflow-y:hidden!important;scrollbar-gutter:stable!important;scrollbar-width:auto!important;overscroll-behavior-x:contain}
+.hierarchy-page-rail .rail-scroll::-webkit-scrollbar{height:13px!important;display:block!important}
+.hierarchy-page-rail .rail-spacer{min-height:1px!important}
+.hierarchy-page-rail .rail-scroll{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;pointer-events:none!important;scrollbar-width:none!important}
+.hierarchy-page-rail .rail-scroll::-webkit-scrollbar{display:none!important}
+.hierarchy-page-rail .rail-visible-track{position:relative;width:100%;height:13px;margin-top:3px;border-radius:10px;background:#e1e5ed;box-shadow:inset 0 1px 3px #25314c25;touch-action:none;cursor:pointer}
+.hierarchy-page-rail .rail-visible-thumb{height:13px;min-width:48px;border-radius:10px;background:#939da8;border:1px solid #87929f;box-shadow:0 1px 3px #1119;will-change:transform;touch-action:none;cursor:grab}
+.hierarchy-page-rail .rail-visible-thumb:active{cursor:grabbing;background:#788493}
+.dark .hierarchy-page-rail .rail-visible-track{background:#35445f}
+.dark .hierarchy-page-rail .rail-visible-thumb{background:#8395b7;border-color:#7183a6}
+
+html.hierarchy-document-scroll body .chart-scroll,body.hierarchy-page-scroll .chart-scroll{scrollbar-width:none!important}
+html.hierarchy-document-scroll body .chart-scroll::-webkit-scrollbar,body.hierarchy-page-scroll .chart-scroll::-webkit-scrollbar{display:none!important}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -2110,21 +2135,87 @@ gridBody=function(kind){
 
 /* v69: fixed left navigation and one bottom horizontal rail on the content area. */
 function setupV69HierarchyRail(){
- const old=document.getElementById('hierarchyPageRail');if(old)old.remove();
+ const previous=document.getElementById('hierarchyPageRail');
+ if(previous)previous.remove();
  if(!(sessionUser&&page==='Team Management'&&view==='Hierarchy'))return;
  const charts=[...document.querySelectorAll('.new-hier .chart-scroll')];
  if(!charts.length)return;
- const maxWidth=Math.max(...charts.map(c=>c.scrollWidth),0);
- const available=Math.max(...charts.map(c=>c.clientWidth),0);
- if(maxWidth<=available+2)return;
- const rail=document.createElement('div');rail.className='hierarchy-page-rail';rail.id='hierarchyPageRail';
- rail.innerHTML='<div class="rail-scroll" id="hierarchyRailScroller" aria-label="Scroll hierarchy charts horizontally" role="region"><div class="rail-spacer"></div></div>';
+ // Always create the content-side scrollbar. Earlier versions omitted it when
+ // clientWidth was measured before the tree had reached its intrinsic width.
+ const rail=document.createElement('div');
+ rail.className='hierarchy-page-rail';
+ rail.id='hierarchyPageRail';
+ rail.innerHTML='<div class="rail-scroll" id="hierarchyRailScroller" tabindex="0"><div class="rail-spacer"></div></div><div class="rail-visible-track" id="hierarchyVisibleTrack" role="scrollbar" tabindex="0" aria-label="Scroll hierarchy chart left or right" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="0"><div class="rail-visible-thumb"></div></div>';
  document.body.appendChild(rail);
- const scroller=document.getElementById('hierarchyRailScroller');
- const inner=scroller.firstElementChild;
- inner.style.width=Math.max(maxWidth,scroller.clientWidth)+'px';
- scroller.addEventListener('scroll',()=>{const x=scroller.scrollLeft;charts.forEach(c=>{if(Math.abs(c.scrollLeft-x)>1)c.scrollLeft=x})},{passive:true});
- charts.forEach(c=>c.addEventListener('scroll',()=>{if(Math.abs(scroller.scrollLeft-c.scrollLeft)>2)scroller.scrollLeft=c.scrollLeft},{passive:true}));
+ const scroller=rail.querySelector('.rail-scroll');
+ const inner=rail.querySelector('.rail-spacer');
+ const track=rail.querySelector('.rail-visible-track');
+ const thumb=rail.querySelector('.rail-visible-thumb');
+ function paintThumb(){
+  const travel=Math.max(1,scroller.scrollWidth-scroller.clientWidth);
+  const fraction=Math.max(0,Math.min(1,scroller.scrollLeft/travel));
+  const trackWidth=Math.max(1,track.clientWidth);
+  const desired=Math.max(48,Math.min(trackWidth,trackWidth*scroller.clientWidth/Math.max(scroller.clientWidth,scroller.scrollWidth)));
+  thumb.style.width=desired+'px';thumb.style.transform='translateX('+Math.round(fraction*(trackWidth-desired))+'px)';
+  track.setAttribute('aria-valuenow',String(Math.round(fraction*1000)));
+ }
+ function updateRange(){
+  if(!rail.isConnected)return;
+  const viewport=Math.max(1,scroller.clientWidth);
+  let widest=viewport;
+  for(const chart of charts){
+   const contentWidth=Math.max(0,...[...chart.querySelectorAll('.org-tree')].map(node=>node.getBoundingClientRect().width));
+   widest=Math.max(widest,chart.scrollWidth,contentWidth+32);
+  }
+  // Keep a visible, usable page-level rail even when the chart fits at this width.
+  inner.style.width=Math.ceil(Math.max(widest,viewport+2))+'px';
+  inner.style.height='1px';
+  paintThumb();
+ }
+ function syncCharts(){
+  const railTravel=Math.max(1,scroller.scrollWidth-scroller.clientWidth);
+  const fraction=scroller.scrollLeft/railTravel;
+  for(const chart of charts){
+   const chartTravel=Math.max(0,chart.scrollWidth-chart.clientWidth);
+   chart.scrollLeft=Math.round(fraction*chartTravel);
+  }
+  paintThumb();
+ }
+ scroller.addEventListener('scroll',syncCharts,{passive:true});
+ let dragStartX=0,dragStartLeft=0;
+ track.addEventListener('pointerdown',event=>{
+  event.preventDefault();track.setPointerCapture(event.pointerId);
+  dragStartX=event.clientX;dragStartLeft=scroller.scrollLeft;
+  if(event.target!==thumb){
+   const rect=track.getBoundingClientRect();
+   const travel=Math.max(1,rect.width-thumb.getBoundingClientRect().width);
+   scroller.scrollLeft=Math.max(0,Math.min(1,(event.clientX-rect.left-thumb.getBoundingClientRect().width/2)/travel))*(scroller.scrollWidth-scroller.clientWidth);
+   dragStartLeft=scroller.scrollLeft;
+  }
+ });
+ track.addEventListener('pointermove',event=>{
+  if(!track.hasPointerCapture(event.pointerId))return;
+  const travel=Math.max(1,track.clientWidth-thumb.getBoundingClientRect().width);
+  scroller.scrollLeft=dragStartLeft+(event.clientX-dragStartX)/travel*(scroller.scrollWidth-scroller.clientWidth);
+ });
+ track.addEventListener('keydown',event=>{
+  if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();scroller.scrollLeft+=(event.key==='ArrowLeft'?-1:1)*Math.max(40,scroller.clientWidth*.1)}
+  if(event.key==='Home'){event.preventDefault();scroller.scrollLeft=0}
+  if(event.key==='End'){event.preventDefault();scroller.scrollLeft=scroller.scrollWidth}
+ });
+
+ // Native horizontal gestures over the chart also update the bottom rail.
+ for(const chart of charts){
+  chart.addEventListener('scroll',()=>{
+   if(Math.abs(chart.scrollLeft- Math.round(scroller.scrollLeft/Math.max(1,scroller.scrollWidth-scroller.clientWidth)*Math.max(0,chart.scrollWidth-chart.clientWidth)))<=2)return;
+   const travel=Math.max(1,chart.scrollWidth-chart.clientWidth);
+   scroller.scrollLeft=Math.round(chart.scrollLeft/travel*Math.max(1,scroller.scrollWidth-scroller.clientWidth));
+  },{passive:true});
+ }
+ updateRange();
+ // Re-measure after fonts/images and layout settle, without rebuilding the rail.
+ requestAnimationFrame(()=>{updateRange();syncCharts()});
+ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{updateRange();syncCharts()});
 }
 const v69PreviousRender=render;
 render=function(){
