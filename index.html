@@ -3115,4 +3115,84 @@ initializeSalesUI=function(){
   else render();
 };
 
+
+/* v82 — Stop repeated invalid refresh-token failures in User Management.
+   Try current access JWT first; refresh only if server explicitly rejects it.
+   If the refresh grant was revoked, stop account-directory auto-polling and
+   offer a clean sign-in, rather than trapping the account list in a retry loop. */
+let v82InvalidSession=false;
+function v82RefreshInvalid(error){
+  return /invalid refresh token|refresh token not found|already used|refresh token.*(invalid|expired)|invalid_grant/i.test(String(error?.message||error||''));
+}
+function v82AuthenticationFailed(error){
+  return /invalid session|session expired|expired jwt|invalid jwt|unauthoriz|not authenticated|token expired|jwt expired/i.test(String(error?.message||error||''));
+}
+function v82NeedsSignIn(message){
+  v82InvalidSession=true;
+  adminDirectoryError=message||'Your saved sign-in has expired. Please sign in again.';
+  adminDirectoryLastAttempt=Date.now();
+  // No further background refresh requests with the revoked grant.
+  salesAuthRefreshToken=null;
+  clearSalesSession();
+}
+accountAdminRequest=async function(payload){
+  if(v82InvalidSession){throw Error('Your session has expired. Sign in again to load accounts.');}
+  if(!salesAuthAccessToken)throw Error('Please sign in to load accounts.');
+  // Use an existing JWT first, even if its reported expiry is close. Refresh
+  // tokens rotate and a stale copy should not prevent a valid access request.
+  try{return await v80AdminDirectoryRequest(payload)}
+  catch(firstError){
+    if(!v82AuthenticationFailed(firstError))throw firstError;
+    try{await renewSalesSession()}
+    catch(refreshError){
+      if(v82RefreshInvalid(refreshError)||v82AuthenticationFailed(refreshError)){
+        v82NeedsSignIn('Your session has expired. Sign in again to load accounts.');
+      }
+      throw refreshError;
+    }
+    try{return await v80AdminDirectoryRequest(payload)}
+    catch(secondError){
+      if(v82AuthenticationFailed(secondError))v82NeedsSignIn('Your session is no longer valid. Sign in again to load accounts.');
+      throw secondError;
+    }
+  }
+};
+const v82DirectoryFetch=fetchAccountDirectory;
+fetchAccountDirectory=async function(){
+  if(v82InvalidSession)return;
+  await v82DirectoryFetch();
+  if(v82InvalidSession && page==='Administration'&&adminTab==='User Management')render();
+};
+const v82DirectoryRefresh=refreshAdminAccountDirectory;
+refreshAdminAccountDirectory=function(){
+  if(v82InvalidSession){v81ReturnToLogin();return;}
+  return v82DirectoryRefresh();
+};
+const v82BaseUserManagement=userManagement;
+userManagement=function(){
+  // Suppress auto-fetch while the saved refresh credential is known invalid.
+  if(v82InvalidSession)adminDirectoryScheduled=true;
+  let html=v82BaseUserManagement();
+  if(v82InvalidSession){
+    html=html.replace(/Unable to load all accounts:[\s\S]*?— Try Refresh Accounts\.<\/p>/,
+      'Your session has expired. Please sign in again.</p>');
+    html=html.replace('</div><div class="user-category-tabs">',
+      '</div><div class="user-category-tabs">');
+    html=html.replace('↻ Refresh Accounts</button>', 'Sign in again</button>');
+  }
+  return html;
+};
+const v82Login=login;
+login=async function(){
+  v82InvalidSession=false;
+  adminDirectoryScheduled=false;
+  adminDirectoryError='';
+  return v82Login();
+};
+const v82Restore=restoreSalesSession;
+restoreSalesSession=async function(){
+  v82InvalidSession=false;
+  return v82Restore();
+};
+
 </script></body></html>
