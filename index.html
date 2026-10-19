@@ -1146,6 +1146,8 @@ html.hierarchy-document-scroll body .chart-scroll::-webkit-scrollbar,body.hierar
  .new-hier .org-tree .hier-manager-direct-row>ul.hier-leaders-row>li{padding-top:0!important}
 }
 
+.ultra-copy-btn{min-width:30px;padding:5px 8px;line-height:1;font-size:17px}.ultra-copy-btn:disabled{opacity:.35;cursor:not-allowed}
+.ultranet-export-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}.ultranet-export-toolbar .btn{font-weight:700;padding:10px 17px}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1686,7 +1688,7 @@ function ultranetData(){
 function ultranet(){
  const branchesForTabs=['All',...branches],rows=ultranetData();
  const cols=[['branch','Branch'],['name','Full Name'],['role','Role'],['status','Status'],['userId','User ID'],...(canViewUltranetPassword()?[['password','Password']]:[])];
- return `<div class="card"><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select></div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
+ return `<div class="card"><div class="ultranet-export-toolbar"><span class="muted">Current branch and filters</span>${ultranetCanExportPasswords()?`<button class="btn secondary sm" type="button" onclick="exportUltranetPDF()">⇩ Export PDF</button>`:canAction('Ultranet','Export')?`<span class="muted" title="Exporting passwords also requires View Password permission">PDF with passwords requires View Password permission</span>`:''}</div><div class="branch-tabs-shell"><button type="button" class="branch-tabs-arrow" aria-label="Previous branches" onclick="scrollBranchTabs(this,-1)">‹</button><div class="branch-tabs" id="ultranet-branch-tabs">${branchesForTabs.map(b=>`<button class="branch-tab ${ultranetBranch===b?'active':''}" onclick="ultranetBranch='${esc(b)}';render()">${esc(b==='All'?'All Branches':b)} <span>${(role==='Admin'?people:visible()).filter(m=>memberInBranch(m,b)&&m.status==='Active').length}</span></button>`).join('')}</div><button type="button" class="branch-tabs-arrow" aria-label="Next branches" onclick="scrollBranchTabs(this,1)">›</button></div><div class="filters"><input placeholder="Search" value="${esc(ultranetTerm)}" oninput="ultranetTerm=this.value;updateUltranetBody()"><select aria-label="Status" onchange="ultranetStatus=this.value;updateUltranetBody()">${option(['Active','Inactive','All'],ultranetStatus)}</select><select aria-label="Role" onchange="ultranetRole=this.value;updateUltranetBody()">${option(['All','Manager','Leader','Member'],ultranetRole)}</select></div><div class="tablewrap"><table class="ultranet-table team-list-table"><thead><tr>${cols.map(([k,t])=>`<th><span class="headerwrap"><button class="data-sort" onclick="ultranetSort={key:'${k}',direction:ultranetSort.key==='${k}'?-ultranetSort.direction:1};render()">${t} ${ultranetSort.key===k?(ultranetSort.direction===1?'↑':'↓'):'↕'}</button>${k!=='password'?`<button class="data-filter-icon" onclick="openUltranetFilter(event,'${k}')">▾</button>`:''}</span></th>`).join('')}</tr></thead><tbody id="ultranet-body">${ultranetRowsHTML(rows)}</tbody></table></div><div class="tablefoot"><div class="muted" id="ultranet-count">Showing ${rows.length} of ${(role==='Admin'?people:visible()).filter(p=>memberInBranch(p,ultranetBranch)&&(ultranetStatus==='All'||p.status===ultranetStatus)&&(ultranetRole==='All'||p.role===ultranetRole)).length}</div></div></div>`;
 }
 function ultranetRowsHTML(rows){
  let previousGroup='';
@@ -1698,7 +1700,7 @@ function ultranetRowsHTML(rows){
   const separator=isGroupStart?`<tr class="team-group-divider ${group.leaderId?'team-group-leader':'team-group-manager'}"><td colspan="${count}"><span class="group-label">${groupLabel}</span></td></tr>`:'';
   const rc=m.role==='Manager'?'ultra-manager-row':m.role==='Leader'?'ultra-leader-row':'';
   const canOpen=ulAllowed('Edit')||ulAllowed('Add');
-  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td>${esc(x.record?.userId||'—')}</td>${canViewUltranetPassword()?`<td><div class="ultra-secret-cell"><span id="ultra-secret-${m.id}">${ultranetPasswordIds.has(Number(m.id))?'••••••••':'—'}</span><button class="btn ghost sm" type="button" onclick="event.stopPropagation();revealUltranetPassword(${m.id})" aria-label="Reveal Ultranet password">◉</button></div></td>`:''}</tr>`;
+  return separator+`<tr class="admin-row ${rc}" ${canOpen?'onclick="openUltranetEdit('+m.id+')"':''}><td>${esc(memberBranchText(m))}</td><td><strong>${esc(m.name)}</strong></td><td><span class="pill role-${m.role.toLowerCase()}">${esc(m.role)}</span></td><td><span class="pill ${m.status==='Active'?'active':'inactive'}">${esc(m.status)}</span></td><td><div class="ultra-secret-cell"><span>${esc(x.record?.userId||'—')}</span><button class="btn ghost sm ultra-copy-btn" type="button" onclick="event.stopPropagation();copyUltranetUserId(${m.id})" aria-label="Copy User ID" title="Copy User ID" ${x.record?.userId?'':'disabled'}>⧉</button></div></td>${canViewUltranetPassword()?`<td><div class="ultra-secret-cell"><span id="ultra-secret-${m.id}">${ultranetPasswordIds.has(Number(m.id))?'••••••••':'—'}</span><button class="btn ghost sm" type="button" onclick="event.stopPropagation();revealUltranetPassword(${m.id})" aria-label="Reveal Ultranet password" title="Show / hide password">◉</button><button class="btn ghost sm ultra-copy-btn" type="button" onclick="event.stopPropagation();copyUltranetPassword(${m.id})" aria-label="Copy Ultranet password" title="Copy Password" ${ultranetPasswordIds.has(Number(m.id))?'':'disabled'}>⧉</button></div></td>`:''}</tr>`;
  }).join('')||`<tr><td colspan="${count}" class="empty">No matching members</td></tr>`;
 }
 
@@ -2120,6 +2122,26 @@ async function revealUltranetPassword(memberId){
   clearTimeout(ultranetRevealTimeouts.get(memberId));
   ultranetRevealTimeouts.set(memberId,setTimeout(()=>{if(el.isConnected){el.textContent=ultranetPasswordIds.has(Number(memberId))?'••••••••':'—';el.dataset.visible='no'}},15000));
  }catch(err){if(el.isConnected)el.textContent='Unable to view';alert(err.message)}
+}
+async function writeUltranetClipboard(text,label){
+ if(!text){notify('No '+label+' to copy.');return;}
+ try{
+  if(!navigator.clipboard?.writeText)throw Error('Clipboard API unavailable');
+  await navigator.clipboard.writeText(String(text));
+  notify(label+' copied.');
+ }catch(err){notify('Unable to copy '+label+'. Allow clipboard access and use HTTPS.');}
+}
+function copyUltranetUserId(memberId){
+ const record=ultranetRecords.find(x=>Number(x.memberId)===Number(memberId));
+ return writeUltranetClipboard(String(record?.userId||'').trim(),'User ID');
+}
+async function copyUltranetPassword(memberId){
+ if(!canViewUltranetPassword())return notify('View Password permission required.');
+ try{
+  const secret=await getUltranetSecret(memberId);
+  if(!secret)return notify('No Ultranet password has been saved yet.');
+  await writeUltranetClipboard(secret,'Password');
+ }catch(err){notify('Unable to copy password: '+(err?.message||'Access denied'));}
 }
 async function loadUltranetPasswordIntoEdit(){
  try {const val=await getUltranetSecret(selected);const el=document.getElementById('ultraPW');if(el){el.value=val||'';el.type='password';}if(!val)alert('No password has been saved yet.');}
@@ -3194,5 +3216,155 @@ restoreSalesSession=async function(){
   v82InvalidSession=false;
   return v82Restore();
 };
+
+
+/* v83: two-stage initial workspace load.  The large branch photographs no longer
+   block successful authentication and first navigation. Mutations are blocked
+   until the complete workspace has loaded, to prevent overwriting photographs. */
+let v83LoadingFull=false, v83FullLoadError='',v83FullLoadEpoch=0;
+const v83LoadFullWorkspace=loadCloudWorkspace;
+async function v83FinishFullWorkspace(epoch){
+ if(v83LoadingFull)return;
+ v83LoadingFull=true;
+ try{
+   await v83LoadFullWorkspace();
+   if(epoch!==v83FullLoadEpoch||!sessionUser)return;
+   v83FullLoadError='';
+ }catch(err){
+   v83FullLoadError=String(err?.message||err);
+   cloudReady=false;
+   console.warn('Background branch image load:',err);
+ }finally{
+   v83LoadingFull=false;
+   if(epoch===v83FullLoadEpoch&&sessionUser)render();
+ }
+}
+async function v83RetryFullLoad(){if(v83LoadingFull)return;v83FullLoadError='';await v83FinishFullWorkspace(v83FullLoadEpoch)}
+loadCloudWorkspace=async function(){
+ const fast=await cloudRequest('/rest/v1/rpc/sales_workspace_fast',{method:'POST',body:'{}'});
+ if(!fast||typeof fast.version==='undefined'||!fast.payload)throw new Error('Workspace is unavailable. Please try again.');
+ cloudVersion=Number(fast.version);
+ cloudApply(fast.payload);
+ cloudReady=false;cloudDirty=false;cloudStatusMessage='';v83FullLoadError='';
+ const epoch=++v83FullLoadEpoch;
+ // Authentication can finish and display the requested page immediately.
+ setTimeout(()=>{if(epoch===v83FullLoadEpoch&&sessionUser)v83FinishFullWorkspace(epoch)},0);
+};
+const v83PreviousRender=render;
+render=function(){
+ v83PreviousRender();
+ if(!sessionUser||sessionUser!=='admin'||cloudReady)return;
+ const target=document.querySelector('main.main #content')||document.querySelector('main.main');
+ if(!target)return;
+ const notice=document.createElement('div');
+ notice.className='cloud-banner';
+ notice.setAttribute('role','status');
+ notice.innerHTML=v83FullLoadError
+   ? 'Some workspace data did not finish loading. Editing is paused. <button type="button" onclick="v83RetryFullLoad()">Retry loading</button>'
+   : 'Loading branch photos in the background. Editing will be available shortly…';
+ target.prepend(notice);
+};
+// Block write actions while the slim workspace is on screen: the saved payload
+// must never omit photos. Navigation, filters and views remain usable.
+document.addEventListener('click',function(event){
+ if(!sessionUser||sessionUser!=='admin'||cloudReady)return;
+ const control=event.target.closest('button,[onclick]');if(!control)return;
+ const code=control.getAttribute('onclick')||'';
+ const change=/\b(?:save|add|edit|delete|remove|create|transfer|changeStatus|setStatus|toggleStatus|upload|duplicate|archive|approve|complete|resetPassword|updatePayment|cancelRequest|acknowledge)\w*\s*\(/i.test(code);
+ if(!change)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ notify('Wait for the remaining workspace data before making changes.');
+},true);
+const v83BeforeLogout=logout;
+logout=async function(){++v83FullLoadEpoch;return v83BeforeLogout()};
+
+
+/* v85: Ultranet printable PDF, based on current branch tab and filtered results.
+   Sensitive passwords are fetched on demand and never added to shared workspace/local storage. */
+function ultranetCanExportPasswords(){
+ return !!salesAuthAccessToken&&canAction('Ultranet','Export')&&canViewUltranetPassword();
+}
+function ultraPdfEscape(s){
+ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function ultraPdfDateTime(date){
+ return new Intl.DateTimeFormat('en-GB',{
+  timeZone:'Asia/Kuala_Lumpur',day:'2-digit',month:'2-digit',year:'numeric',
+  hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true
+ }).format(date).replace(',', '');
+}
+async function exportUltranetPDF(){
+ if(!ultranetCanExportPasswords())return notify('Export and View Password permissions are required to export Ultranet passwords.');
+ const rows=ultranetData().map(({member,record})=>({
+  memberId:Number(member.id), branch:memberBranchText(member),name:member.name,
+  role:({Manager:'Sales Manager',Leader:'Sales Team Leader',Member:'Sales Advisor'}[member.role]||member.role),
+  status:member.status,userId:record?.userId||'',password:''
+ }));
+ if(!rows.length)return notify('No matching Ultranet records to export.');
+ // Open synchronously from the click to avoid popup blockers after asynchronous password reads.
+ const printWindow=window.open('','_blank');
+ if(!printWindow)return notify('Allow pop-ups to export the PDF, then try again.');
+ printWindow.document.open();
+ printWindow.document.write('<!doctype html><html><head><title>Preparing Ultranet PDF</title></head><body style="font:15px Arial,sans-serif;padding:28px">Preparing secure Ultranet PDF…</body></html>');
+ printWindow.document.close();
+ try{
+  if(!ultranetCanExportPasswords())throw Error('Password export permission is no longer available.');
+  // Limit concurrent secret requests, and require every returned password to be valid.
+  let cursor=0;
+  const workers=Array.from({length:Math.min(4,rows.length)},async()=>{
+   while(cursor<rows.length){
+    const i=cursor++;const row=rows[i];
+    if(!ultranetPasswordIds.has(row.memberId)){row.password='—';continue;}
+    const secret=await cloudRequest('/rest/v1/rpc/ultranet_password_export_read',{method:'POST',body:JSON.stringify({p_member_id:row.memberId})});
+    if(typeof secret!=='string')throw Error('Could not securely read the password for '+row.name+'. Export cancelled.');
+    row.password=secret||'—';
+   }
+  });
+  await Promise.all(workers);
+  if(!ultranetCanExportPasswords())throw Error('Password export permission changed. Export cancelled.');
+  const branch=ultranetBranch==='All'?'All Branches':ultranetBranch;
+  const exportUser=(typeof currentLoginUserId==='function'?currentLoginUserId():sessionUser==='admin'?'ADMIN':String(sessionUser||'')).toUpperCase();
+  const exported=ultraPdfDateTime(new Date());
+  const byStatus=ultranetStatus!=='All'?'Status: '+ultranetStatus:'';
+  const byRole=ultranetRole!=='All'?'Role: '+ultranetRole:'';
+  const bySearch=ultranetTerm?'Search: '+ultranetTerm:'';
+  const filters=[byStatus,byRole,bySearch].filter(Boolean).join('  |  ');
+  const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Ultranet - ${ultraPdfEscape(branch)}</title>
+  <style>
+  @page{size:A4 landscape;margin:17mm 12mm 22mm 12mm}
+  *{box-sizing:border-box}body{font:10px/1.4 Arial,Helvetica,sans-serif;color:#233147;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  h1{font-size:20px;color:#26365d;margin:0 0 4px;font-weight:750}
+  .report-top{border-bottom:3px solid #7969ca;padding-bottom:12px;margin-bottom:12px}
+  .subtitle{font-size:12px;font-weight:700;color:#6e56a6}.small{font-size:9px;color:#66738c;margin-top:6px}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}
+  th,td{border:1px solid #899bb6;padding:7px 8px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
+  th{background:#e8e5fb;color:#283561;font-weight:700;font-size:10px}
+  tbody tr:nth-child(even) td{background:#f5f7fc}
+  .role-manager{background:#eaf1ff}.role-leader{background:#e5f7f7}.role-member{background:#fff2e5}
+  .inactive{color:#a43b4b;font-weight:700}.active{color:#1e7d65;font-weight:700}
+  .footer{position:fixed;bottom:-12mm;left:0;right:0;border-top:1px solid #b8c4d6;padding-top:6px;color:#68758e;font-size:9px;display:flex;justify-content:space-between}
+  .secret{font-family:Arial,Helvetica,sans-serif;white-space:pre-wrap}
+  .no-print{margin-bottom:12px;font-size:12px;color:#4b5b77}
+  @media print{.no-print{display:none}}
+  </style></head><body>
+  <div class="no-print">Choose <b>Save as PDF</b> in the browser print dialog. This file contains sensitive passwords—store it securely.</div>
+  <div class="report-top"><h1>IT — Ultranet User Listing</h1><div class="subtitle">Branch: ${ultraPdfEscape(branch)}</div>
+  <div class="small">${ultraPdfEscape(filters||'All current matching records')} · ${rows.length} user${rows.length===1?'':'s'}</div></div>
+  <table><colgroup><col style="width:14%"><col style="width:22%"><col style="width:16%"><col style="width:10%"><col style="width:17%"><col style="width:21%"></colgroup>
+  <thead><tr><th>Branch</th><th>Full Name</th><th>Role</th><th>Status</th><th>User ID</th><th>Password</th></tr></thead>
+  <tbody>${rows.map(r=>`<tr><td>${ultraPdfEscape(r.branch)}</td><td><b>${ultraPdfEscape(r.name)}</b></td><td class="role-${r.role.includes('Manager')?'manager':r.role.includes('Leader')?'leader':'member'}">${ultraPdfEscape(r.role)}</td><td class="${r.status==='Active'?'active':'inactive'}">${ultraPdfEscape(r.status)}</td><td>${ultraPdfEscape(r.userId||'—')}</td><td class="secret">${ultraPdfEscape(r.password)}</td></tr>`).join('')}</tbody></table>
+  <div class="footer"><span>Exported By: ${ultraPdfEscape(exportUser)} &nbsp;|&nbsp; Exported Date &amp; Time: ${ultraPdfEscape(exported)} (MYT)</span><span>Confidential · Contains passwords</span></div>
+  </body></html>`;
+  if(printWindow.closed)throw Error('Export window was closed.');
+  printWindow.document.open();printWindow.document.write(html);printWindow.document.close();
+  printWindow.focus();
+  printWindow.setTimeout(()=>{try{printWindow.print()}catch(e){console.warn('Print dialog unavailable:',e)}},250);
+ }catch(err){
+  const message='Ultranet PDF export failed: '+(err?.message||'Please retry.');
+  if(!printWindow.closed){printWindow.document.open();printWindow.document.write('<!doctype html><title>Ultranet PDF error</title><body style="font:15px Arial;padding:24px;color:#a33">'+ultraPdfEscape(message)+'</body>');printWindow.document.close()}
+  notify(message);
+ }
+}
 
 </script></body></html>
