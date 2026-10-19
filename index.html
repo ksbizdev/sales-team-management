@@ -1007,6 +1007,12 @@ html.hierarchy-document-scroll body .chart-scroll::-webkit-scrollbar,body.hierar
 .hierarchy-page-rail .rail-visible-track{height:7px!important;margin-top:3px!important;border-radius:8px!important;box-shadow:inset 0 1px 2px #25314c18!important}
 .hierarchy-page-rail .rail-visible-thumb{height:7px!important;min-height:7px!important;border-radius:8px!important;border:0!important;box-shadow:none!important}
 .hierarchy-page-rail .rail-scroll{height:100%!important}
+
+/* v73 admin account role / branch inputs */
+.v73-branch-box{border:1px solid #dce4f4;border-radius:12px;padding:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:180px;overflow-y:auto}
+.v73-branch-choice{display:flex!important;gap:8px;align-items:center;font-size:13px!important;font-weight:550!important;color:inherit!important;margin:0!important;cursor:pointer}
+.v73-branch-choice input{width:16px!important;height:16px;flex:none;margin:0}
+@media(max-width:500px){.v73-branch-box{grid-template-columns:1fr}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -2278,4 +2284,188 @@ function filterNewAccountSalespeople(query){
 function chooseNewAccountSalesperson(id){const p=byId(Number(id)),input=document.getElementById('accountPersonSearch'),hidden=document.getElementById('accountPersonId'),dropdown=document.getElementById('salesPersonDropdown');if(!p)return;selectedLoginMemberId=p.id;if(input){input.value=p.name;input.setAttribute('aria-expanded','false')}if(hidden)hidden.value=String(p.id);if(dropdown)dropdown.hidden=true;refreshCategorizedAccountSummary()}
 function onSalespersonPickerKey(e){if(e.key==='Escape'){const d=document.getElementById('salesPersonDropdown');if(d)d.hidden=true;const i=document.getElementById('accountPersonSearch');if(i)i.setAttribute('aria-expanded','false');return;}if(e.key==='Enter'){e.preventDefault();const first=salespersonPickerMatches(e.currentTarget.value)[0];if(first)chooseNewAccountSalesperson(first.id)}}
 document.addEventListener('pointerdown',e=>{const picker=document.querySelector('.sales-person-picker');if(picker&&!picker.contains(e.target)){const d=document.getElementById('salesPersonDropdown'),i=document.getElementById('accountPersonSearch');if(d)d.hidden=true;if(i)i.setAttribute('aria-expanded','false')}});
+
+/* v72 — permission-and-branch-aware notifications (presentation-layer filtering).
+   Older unscoped events are visible only to system admins. */
+function notificationIdentity(){
+ if(!sessionUser)return '';
+ return sessionUser==='admin'?'admin':String(byId(sessionUser)?.username||sessionUser);
+}
+function notificationPermissionModule(moduleName){
+ const m=String(moduleName||'').trim();
+ if(m==='Administration / Branch Setup'||m.startsWith('Administration /'))return 'Administration';
+ return ['Dashboard','Team Management','Ultranet','Activity History','Administration'].includes(m)?m:null;
+}
+function notificationActionPermission(action){
+ let verb=normalizeAuditAction(action);
+ if(verb==='Ultranet'||verb==='Other'&&/save|update|change/i.test(String(action)))verb='Edit';
+ if(verb==='Add')return 'Add';
+ if(verb==='Edit')return 'Edit';
+ if(verb==='Delete')return 'Delete';
+ if(verb==='Export')return 'Export';
+ return null;
+}
+function notificationBranchesFromEvent(action,detail,moduleName){
+ const text=String(detail||'');
+ const matches=new Set();
+ for(const b of branches){
+  const name=String(b||'').trim();
+  if(!name)continue;
+  // A branch reference must occur as a complete token, never as part of a name.
+  const pos=text.toLowerCase().indexOf(name.toLowerCase());
+  if(pos>=0){const before=text[pos-1]||'',after=text[pos+name.length]||'';
+   if(!/[\p{L}\p{N}]/u.test(before)&&!/[\p{L}\p{N}]/u.test(after))matches.add(name);
+  }
+ }
+ const module=notificationPermissionModule(moduleName);
+ if(module==='Team Management'||module==='Ultranet'){
+  const persons=people.filter(p=>p.name&&text.toLowerCase().includes(String(p.name).toLowerCase()));
+  // If multiple named members are affected, conservatively include all branches.
+  for(const p of persons)for(const b of memberBranches(p))matches.add(b);
+  // For member editors, the selected member can be a reliable fallback only if
+  // the logged event actually names the selected member.
+ }
+ return [...matches];
+}
+function notificationEventMetadata(action,detail){
+ const module=activityModuleFromEvent({action,detail});
+ return {module,permissionAction:notificationActionPermission(action),branches:notificationBranchesFromEvent(action,detail,module)};
+}
+const _v72OldLog=log;
+log=function(action,detail){
+ _v72OldLog(action,detail);
+ if(notices.length){
+  Object.assign(notices[0],notificationEventMetadata(action,detail));
+  notices[0].userId=notificationIdentity();
+  // Scoped viewers only see events with explicit, resolvable metadata.
+  persist();
+ }
+};
+function canSeeNotification(n){
+ if(!sessionUser||!n)return false;
+ const module=notificationPermissionModule(n.module);
+ // Admin receives all notifications, including legacy records and system events.
+ if(sessionUser==='admin')return true;
+ if(!module||!hasModule(module))return false;
+ const required=n.permissionAction||notificationActionPermission(n.action);
+ if(!required||!canAction(module,required))return false;
+ // Branch-related events without reliable metadata are not shown to restricted staff.
+ if(module==='Team Management'||module==='Ultranet'||String(n.module).includes('Branch Setup')){
+  if(!Array.isArray(n.branches)||!n.branches.length)return false;
+  const scopedModule=module==='Administration'?'Team Management':module;
+  const scope=new Set(assignedBranchAccess(scopedModule));
+  if(!n.branches.every(b=>scope.has(b)))return false;
+ }
+ return true;
+}
+function notificationVisibleList(){return notices.filter(canSeeNotification)}
+function notificationReadKey(){return 'sales-team-notification-read-v72:'+notificationIdentity()}
+function notificationReadSet(){try{return new Set(JSON.parse(localStorage.getItem(notificationReadKey())||'[]'))}catch(e){return new Set()}}
+function notificationKey(n){return [n.time,n.userId||n.actor||'',n.action,n.detail].join('::')}
+function notificationIsUnread(n){return !notificationReadSet().has(notificationKey(n))}
+function notificationUnreadCount(){const read=notificationReadSet();return notificationVisibleList().filter(n=>!read.has(notificationKey(n))).length}
+function markVisibleNotificationsRead(){const read=notificationReadSet();for(const n of notificationVisibleList())read.add(notificationKey(n));try{localStorage.setItem(notificationReadKey(),JSON.stringify([...read].slice(-1000)))}catch(e){};render()}
+toggleNotifications=function(){
+ const e=document.getElementById('notifications');if(!e)return;
+ const opening=e.classList.contains('hidden');
+ e.className=opening?'notif card':'hidden';
+ if(!opening)return;
+ const visible=notificationVisibleList();
+ e.innerHTML='<h2>Notifications <button class="btn ghost sm" onclick="markVisibleNotificationsRead()">Mark all read</button></h2>'+
+  (visible.slice(0,15).map(n=>'<div class="notice"><b>'+esc(normalizeAuditAction(n.action))+' · '+esc(notificationPermissionModule(n.module)||'System')+'</b><br>'+esc(n.detail)+'<br><small>'+esc(n.time)+'</small></div>').join('')||'<p class="muted">No notifications for your permissions</p>');
+};
+const _v72PriorRender=render;
+render=function(){
+ _v72PriorRender();
+ if(!sessionUser)return;
+ const toolbar=document.querySelector('header.top .toolbar');if(!toolbar)return;
+ const existing=[...toolbar.querySelectorAll('button')].filter(b=>b.textContent.includes('Notifications'));
+ const button=existing[0]||document.createElement('button');
+ for(const duplicate of existing.slice(1))duplicate.remove();
+ button.className='btn ghost sm';
+ const unread=notificationUnreadCount();
+ button.textContent='♧ Notifications'+(unread?' ('+unread+')':'');
+ button.onclick=toggleNotifications;
+ if(!existing.length)toolbar.appendChild(button);
+};
+
+
+/* v73: New admin and existing admin share an editable form; root account remains protected. */
+let editingAdminAccountId=null;
+const _v73Directory=userDirectoryRows;
+userDirectoryRows=function(){
+ if(accountCategory!=='Admin')return _v73Directory();
+ const list=[{id:'root',name:'Administrator',username:'admin',role:'Superadmin',branch:'All Branches',state:'Enabled',primary:true}];
+ for(const a of adminAccountDirectory.filter(a=>a.category==='Admin'&&String(a.username).toLowerCase()!=='admin')){
+  list.push({id:a.id,name:a.full_name,username:a.username,role:a.role||'Admin',branch:(a.branches||[]).join(', ')||'All Branches',state:a.enabled?'Enabled':'Disabled',primary:false});
+ }
+ const kw=accountDirectoryQuery.toLowerCase().trim();
+ return list.filter(a=>!kw||[a.name,a.username,a.role,a.branch,a.state].some(x=>String(x||'').toLowerCase().includes(kw))).map(a=>`<tr><td><strong>${esc(a.name)}</strong></td><td>${esc(a.username)}</td><td>${salesRoleBadge(a.role)}</td><td>${esc(a.branch)}</td><td><span class="pill ${a.state==='Enabled'?'':'off'}">${esc(a.state)}</span></td><td><button class="btn ghost sm" onclick="${a.primary?'openAuthenticatedAdminDetails()':`openV73AdminEditor('${a.id}')`}">${a.primary?'View':'Edit'}</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No matching users</td></tr>';
+};
+function openV73AdminEditor(id){
+ const a=adminAccountDirectory.find(x=>x.id===id&&x.category==='Admin');
+ if(!a)return notify('Admin account not found. Refresh the list.');
+ editingAdminAccountId=id;modal='v73AdminEdit';render();
+}
+const _v73NewUserModal=openCategorizedAccountCreate;
+openCategorizedAccountCreate=function(){editingAdminAccountId=null;_v73NewUserModal()};
+function v73AdminRoleOptions(selected){
+ const roles=[...new Set(['Admin','Manager','Leader','Member',...(roleSetupNames||[]).filter(n=>n!=='Superadmin')])];
+ if(selected&&!roles.includes(selected))roles.push(selected);
+ return roles.map(r=>`<option value="${esc(r)}" ${r===selected?'selected':''}>${esc(r==='Member'?'Sales Advisor':r==='Leader'?'Team Leader':r==='Manager'?'Sales Manager':r)}</option>`).join('');
+}
+function v73BranchOptions(selected){
+ const names=(branchData||[]).filter(b=>b.status!=='Inactive').map(b=>b.name).filter(Boolean);
+ const chosen=Array.isArray(selected)&&selected.length?selected:['All Branches'];
+ return `<div class="v73-branch-box"><label class="v73-branch-choice"><input type="checkbox" data-admin-branch="All Branches" ${chosen.includes('All Branches')?'checked':''} onchange="v73ToggleBranches(this)"> All Branches</label>${names.map(b=>`<label class="v73-branch-choice"><input type="checkbox" data-admin-branch="${esc(b)}" ${chosen.includes(b)?'checked':''} onchange="v73ToggleBranches(this)"> ${esc(b)}</label>`).join('')}</div>`;
+}
+function v73ToggleBranches(changed){
+ const list=[...document.querySelectorAll('input[data-admin-branch]')];
+ if(changed.dataset.adminBranch==='All Branches'&&changed.checked)list.forEach(x=>{if(x!==changed)x.checked=false});
+ if(changed.dataset.adminBranch!=='All Branches'&&changed.checked)list.forEach(x=>{if(x.dataset.adminBranch==='All Branches')x.checked=false});
+}
+function v73AdminForm(account){
+ const isEdit=Boolean(account);
+ const heading=isEdit?'Edit Admin':'Create Admin';
+ return `<div class="admin-create-form">
+ <div><label for="newAdminFullName">Full Name *</label><input id="newAdminFullName" autocomplete="name" placeholder="Enter full name" value="${esc(account?.full_name||'')}"></div>
+ <div><label for="newAdminUserId">User ID *</label><input id="newAdminUserId" autocomplete="off" placeholder="Enter User ID" value="${esc(account?.username||'')}"></div>
+ <div><label for="newAdminPassword">${isEdit?'New Password (leave blank to keep existing)':'Password *'}</label><input id="newAdminPassword" type="password" autocomplete="new-password" placeholder="${isEdit?'Optional: set a new password':'Enter login password'}"></div>
+ <div><label for="newAdminRole">Role *</label><select id="newAdminRole">${v73AdminRoleOptions(account?.role||'Admin')}</select></div>
+ <div><label>Branch Access *</label>${v73BranchOptions(account?.branches)}</div>
+ </div><p class="muted" style="font-size:12px">Role and branch choices are saved to your Supabase account profile. Role-based data isolation for other accounts is not yet fully connected; do not grant production access until it is tested.</p>
+ <div class="actions" style="margin-top:16px"><button class="btn" id="categoryCreateButton" onclick="saveAdminAccount()">${isEdit?'Save Changes':'Create Admin'}</button><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
+}
+const _v73CategoryForm=categorizedAccountForm;
+categorizedAccountForm=function(){
+ if(createAccountCategory!=='Admin')return _v73CategoryForm();
+ return `<div class="user-category-modal-row"><button class="btn">Admin</button><button class="btn secondary" onclick="switchNewAccountCategory('Salesperson')">Salesperson</button></div>${v73AdminForm(null)}`;
+};
+const _v73Modal=modalHTML;
+modalHTML=function(){
+ if(modal!=='v73AdminEdit')return _v73Modal();
+ const account=adminAccountDirectory.find(x=>x.id===editingAdminAccountId&&x.category==='Admin');
+ return `<div class="overlay"><div class="modal wide-modal" role="dialog" aria-modal="true"><div class="toolbar" style="justify-content:space-between"><h2>Edit Admin</h2><button class="btn ghost sm" onclick="closeModal()">✕</button></div><p id="modalError" class="moto-error"></p>${account?v73AdminForm(account):'<p>Account not found.</p>'}</div></div>`;
+};
+saveAdminAccount=async function(){
+ const editing=modal==='v73AdminEdit',account=editing?adminAccountDirectory.find(x=>x.id===editingAdminAccountId&&x.category==='Admin'):null;
+ const name=String(document.getElementById('newAdminFullName')?.value||'').trim();
+ const username=String(document.getElementById('newAdminUserId')?.value||'').trim().toLowerCase();
+ const password=String(document.getElementById('newAdminPassword')?.value||'');
+ const chosenRole=String(document.getElementById('newAdminRole')?.value||'Admin');
+ const branches=[...document.querySelectorAll('input[data-admin-branch]:checked')].map(x=>x.dataset.adminBranch);
+ if(!name)return showModalError('Full Name is required.');
+ if(!/^[a-z0-9][a-z0-9._-]{2,59}$/.test(username))return showModalError('User ID must be 3–60 valid characters.');
+ if(!editing&&!password)return showModalError('Please enter a password.');
+ if(editing&&!account)return showModalError('Account not found.');
+ if(!branches.length)return showModalError('Select at least one branch or All Branches.');
+ const btn=document.getElementById('categoryCreateButton');if(btn)btn.disabled=true;
+ try{
+  await accountAdminRequest({action:editing?'update_admin':'create_admin',user_id:account?.id,full_name:name,username,password,role:chosenRole,branches});
+  log(editing?'Edit Admin':'Add Admin',`${editing?'Updated':'Created'} ${username}: role ${chosenRole}, branches ${branches.join(', ')}`);
+  modal='';editingAdminAccountId=null;accountCategory='Admin';await fetchAccountDirectory();render();
+ }catch(err){showModalError('Could not '+(editing?'update':'create')+' Admin: '+(err?.message||'Account service unavailable'));}
+ finally{if(btn&&btn.isConnected)btn.disabled=false}
+};
+
 </script></body></html>
