@@ -1155,6 +1155,11 @@ html.hierarchy-document-scroll body .chart-scroll::-webkit-scrollbar,body.hierar
 body.starlight .ultra-copy-btn,body.dark .ultra-copy-btn{background:#263258!important;color:#c7d0ff!important;border-color:rgba(180,185,255,.25)!important}
 .ultranet-export-inline{margin-left:auto;white-space:nowrap;font-weight:700;padding:10px 17px!important}
 @media(max-width:620px){.ultranet-export-inline{margin-left:0;width:100%}}
+
+/* v88 non-blocking Ultranet copy toast */
+.ultranet-copy-toast{position:fixed;right:22px;bottom:26px;z-index:99999;pointer-events:none;background:#242e49;color:#fff;border-radius:12px;padding:9px 17px;font-size:13px;font-weight:650;box-shadow:0 10px 34px rgba(20,34,70,.22);opacity:0;transform:translateY(10px);transition:opacity .18s,transform .18s}
+.ultranet-copy-toast.show{opacity:1;transform:translateY(0)}.ultranet-copy-toast.failure{background:#a93448}
+@media(max-width:650px){.ultranet-copy-toast{right:14px;bottom:95px}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1504,7 +1509,7 @@ function exportCSV(filteredOnly){return exportTeamXLSX(filteredOnly)}
 
 const modules=['Dashboard','Team Management','Ultranet','Activity History','Administration'];
 const actions=['View','Add','Edit','Delete','Export'];
-const moduleCapabilities={'Dashboard':['View'],'Team Management':['View','Add','Edit','Delete','Export'],'Activity History':['View'],'Administration':['View','Add','Edit','Delete'],'Ultranet':['View','Add','Edit','Delete']};
+const moduleCapabilities={'Dashboard':['View'],'Team Management':['View','Add','Edit','Delete','Export'],'Activity History':['View'],'Administration':['View','Add','Edit','Delete'],'Ultranet':['View','Add','Edit','Delete','Export']};
 let sessionUser=null,loginEvents=[],branchData=[],accountsReady=false;
 let dataFilters={},dataSort={},dataPopup=null,dataSearchKeyword='',dataExclusions=new Set(),accountFormError='',branchFormError='';
 function defaultPerms(r){if(r==='Admin')return Object.fromEntries(modules.map(m=>[m,moduleCapabilities[m].slice()]));if(r==='Manager')return {'Dashboard':['View'],'Team Management':['View','Add','Edit'],'Ultranet':['View']};if(r==='Leader')return {'Dashboard':['View'],'Team Management':['View','Add','Edit'],'Ultranet':['View']};return {'Dashboard':['View'],'Team Management':['View'],'Ultranet':['View']}}
@@ -2130,10 +2135,17 @@ async function revealUltranetPassword(memberId){
   ultranetRevealTimeouts.set(memberId,setTimeout(()=>{if(el.isConnected){el.textContent=ultranetPasswordIds.has(Number(memberId))?'••••••••':'—';el.dataset.visible='no'}},15000));
  }catch(err){if(el.isConnected)el.textContent='Unable to view';alert(err.message)}
 }
+function ultranetCopyToast(message,ok=true){
+ let el=document.getElementById('ultranet-copy-toast');
+ if(!el){el=document.createElement('div');el.id='ultranet-copy-toast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el);}
+ el.textContent=message;el.className='ultranet-copy-toast '+(ok?'success':'failure')+' show';
+ clearTimeout(ultranetCopyToast.timer);
+ ultranetCopyToast.timer=setTimeout(()=>el.classList.remove('show'),1600);
+}
 function writeUltranetClipboard(text,label){
  // Copy silently without invoking the browser's Clipboard Permission dialog.
  // We intentionally avoid navigator.clipboard.writeText, which can prompt on some browsers.
- if(!text){notify('No '+label+' to copy.');return false;}
+ if(!text){ultranetCopyToast('Nothing to copy',false);return false;}
  const active=document.activeElement;
  const input=document.createElement('textarea');
  input.value=String(text);
@@ -2147,7 +2159,7 @@ function writeUltranetClipboard(text,label){
   copied=!!document.execCommand('copy');
  }catch(_error){copied=false;}
  finally{input.remove();try{active?.focus?.({preventScroll:true})}catch(_){}}
- notify(copied?label+' copied.':'Unable to copy '+label+' in this browser.');
+ ultranetCopyToast(copied?'Copied':'Copy failed',copied);
  return copied;
 }
 function copyUltranetUserId(memberId){
@@ -2155,19 +2167,19 @@ function copyUltranetUserId(memberId){
  return writeUltranetClipboard(String(record?.userId||'').trim(),'User ID');
 }
 async function copyUltranetPassword(memberId){
- if(!canViewUltranetPassword())return notify('View Password permission required.');
+ if(!canViewUltranetPassword())return ultranetCopyToast('Access denied',false);
  try{
   const secret=await getUltranetSecret(memberId);
-  if(!secret)return notify('No Ultranet password has been saved yet.');
-  await writeUltranetClipboard(secret,'Password');
- }catch(err){notify('Unable to copy password: '+(err?.message||'Access denied'));}
+  if(!secret)return ultranetCopyToast('Password not set',false);
+  writeUltranetClipboard(secret,'Password');
+ }catch(err){ultranetCopyToast('Unable to copy password',false);}
 }
 async function loadUltranetPasswordIntoEdit(){
  try {const val=await getUltranetSecret(selected);const el=document.getElementById('ultraPW');if(el){el.value=val||'';el.type='password';}if(!val)alert('No password has been saved yet.');}
  catch(err){showModalError(err.message)}
 }
 async function copyExistingUltranetPassword(){
- try{const val=await getUltranetSecret(selected);if(!val)return alert('No password has been saved yet.');await navigator.clipboard.writeText(val);notify('Password copied.');}
+ try{const val=await getUltranetSecret(selected);if(!val)return ultranetCopyToast('Password not set',false);writeUltranetClipboard(val,'Password');}
  catch(err){showModalError(err.message)}
 }
 // Authorized viewer can save a password; everyone else can still edit the Ultranet User ID when allowed.
@@ -3316,6 +3328,7 @@ async function exportUltranetPDF(){
  if(!ultranetCanExportPasswords())return notify('Export and View Password permissions are required to export Ultranet passwords.');
  const rows=ultranetData().map(({member,record})=>({
   memberId:Number(member.id), branch:memberBranchText(member),name:member.name,
+  rawRole:member.role,group:memberGroup(member),
   role:({Manager:'Sales Manager',Leader:'Sales Team Leader',Member:'Sales Advisor'}[member.role]||member.role),
   status:member.status,userId:record?.userId||'',password:''
  }));
@@ -3328,18 +3341,20 @@ async function exportUltranetPDF(){
  printWindow.document.close();
  try{
   if(!ultranetCanExportPasswords())throw Error('Password export permission is no longer available.');
-  // Limit concurrent secret requests, and require every returned password to be valid.
-  let cursor=0;
-  const workers=Array.from({length:Math.min(4,rows.length)},async()=>{
-   while(cursor<rows.length){
-    const i=cursor++;const row=rows[i];
+  // One server-side RPC validates Export, View Password and branch scope per member.
+  // No partial report is created when a credential cannot be retrieved.
+  const requested=rows.filter(row=>ultranetPasswordIds.has(row.memberId));
+  const secrets=requested.length?await cloudRequest('/rest/v1/rpc/ultranet_password_export_batch',{
+    method:'POST',body:JSON.stringify({p_member_ids:requested.map(r=>r.memberId)})
+  }):[];
+  if(!Array.isArray(secrets)||secrets.length!==requested.length)throw Error('Secure export returned incomplete credentials. Export cancelled.');
+  const secretMap=new Map(secrets.map(item=>[Number(item.member_id),item.password]));
+  for(const row of rows){
     if(!ultranetPasswordIds.has(row.memberId)){row.password='—';continue;}
-    const secret=await cloudRequest('/rest/v1/rpc/ultranet_password_export_read',{method:'POST',body:JSON.stringify({p_member_id:row.memberId})});
-    if(typeof secret!=='string')throw Error('Could not securely read the password for '+row.name+'. Export cancelled.');
-    row.password=secret||'—';
-   }
-  });
-  await Promise.all(workers);
+    if(!secretMap.has(row.memberId)||typeof secretMap.get(row.memberId)!=='string')
+      throw Error('Password for '+row.name+' could not be loaded. Export cancelled.');
+    row.password=secretMap.get(row.memberId);
+  }
   if(!ultranetCanExportPasswords())throw Error('Password export permission changed. Export cancelled.');
   const branch=ultranetBranch==='All'?'All Branches':ultranetBranch;
   const exportUser=(typeof currentLoginUserId==='function'?currentLoginUserId():sessionUser==='admin'?'ADMIN':String(sessionUser||'')).toUpperCase();
@@ -3360,7 +3375,11 @@ async function exportUltranetPDF(){
   th,td{border:1px solid #c9d2e7;padding:7px 8px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
   th{background:#eef0ff;color:#5263b9;font-weight:700;font-size:10px}
   tbody tr:nth-child(even) td{background:#f7f9fd}
-  .role-manager{background:#eaf1ff!important;color:#396bb7}.role-leader{background:#e5f7f7!important;color:#168a91}.role-member{background:#fff2e5!important;color:#b97527}
+  .role-pill{display:inline-block;border-radius:999px;padding:3px 9px;font-weight:700;white-space:nowrap;font-size:9px}
+  .role-manager{background:#e9edff;color:#4b5bca}.role-leader{background:#dff5f1;color:#087f7c}.role-member{background:#fff0df;color:#ae6e16}
+  .group-manager td{background:#e7eaff!important;color:#344ca2;font-size:10px;font-weight:750;padding:8px 10px;border-color:#c4cceb}
+  .group-leader td{background:#e1f4ef!important;color:#067d76;font-size:10px;font-weight:750;padding:8px 10px;border-color:#bbded9}
+  .group-row{break-after:avoid;page-break-after:avoid}
   .inactive{color:#a43b4b;font-weight:700}.active{color:#1e7d65;font-weight:700}
   .footer{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #dae1ef;padding-top:5px;color:#68758e;font-size:9px;display:flex;justify-content:space-between;break-inside:avoid;page-break-inside:avoid}
   .secret{font-family:Arial,Helvetica,sans-serif;white-space:pre-wrap}
@@ -3368,11 +3387,17 @@ async function exportUltranetPDF(){
   @media print{.no-print{display:none}}
   </style></head><body>
   <div class="no-print">Choose <b>Save as PDF</b> in the browser print dialog. This file contains sensitive passwords—store it securely.</div>
-  <div class="report-top"><h1>IT — Ultranet User Listing</h1><div class="subtitle">Branch: ${ultraPdfEscape(branch)}</div>
+  <div class="report-top"><h1>Ultranet User Listing</h1><div class="subtitle">Branch: ${ultraPdfEscape(branch)}</div>
   <div class="small">${ultraPdfEscape(filters||'All current matching records')} · ${rows.length} user${rows.length===1?'':'s'}</div></div>
   <table><colgroup><col style="width:14%"><col style="width:22%"><col style="width:16%"><col style="width:10%"><col style="width:17%"><col style="width:21%"></colgroup>
   <thead><tr><th>Branch</th><th>Full Name</th><th>Role</th><th>Status</th><th>User ID</th><th>Password</th></tr></thead>
-  <tbody>${rows.map(r=>`<tr><td>${ultraPdfEscape(r.branch)}</td><td><b>${ultraPdfEscape(r.name)}</b></td><td class="role-${r.role.includes('Manager')?'manager':r.role.includes('Leader')?'leader':'member'}">${ultraPdfEscape(r.role)}</td><td class="${r.status==='Active'?'active':'inactive'}">${ultraPdfEscape(r.status)}</td><td>${ultraPdfEscape(r.userId||'—')}</td><td class="secret">${ultraPdfEscape(r.password)}</td></tr>`).join('')}</tbody></table>
+  <tbody>${(()=>{let prev='';return rows.map(r=>{
+    const g=r.group||{},key=String(g.managerId||0)+':'+String(g.leaderId||0);
+    const separator=key!==prev?`<tr class="group-row ${g.leaderId?'group-leader':'group-manager'}"><td colspan="6">${ultraPdfEscape(g.leaderId?(g.leaderName+' · Sales Team Leader'):(g.managerName+' · Sales Manager'))}</td></tr>`:'';
+    prev=key;
+    const pill=r.rawRole==='Manager'?'manager':r.rawRole==='Leader'?'leader':'member';
+    return separator+`<tr><td>${ultraPdfEscape(r.branch)}</td><td><b>${ultraPdfEscape(r.name)}</b></td><td><span class="role-pill role-${pill}">${ultraPdfEscape(r.role)}</span></td><td class="${r.status==='Active'?'active':'inactive'}">${ultraPdfEscape(r.status)}</td><td>${ultraPdfEscape(r.userId||'—')}</td><td class="secret">${ultraPdfEscape(r.password)}</td></tr>`;
+   }).join('')})()}</tbody></table>
   <div class="footer"><span>${ultraPdfEscape(exportUser)} &nbsp;·&nbsp; ${ultraPdfEscape(exported)}</span><span>Confidential · Contains passwords</span></div>
   </body></html>`;
   if(printWindow.closed)throw Error('Export window was closed.');
