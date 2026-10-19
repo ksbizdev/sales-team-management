@@ -1186,6 +1186,22 @@ body.starlight .ultra-copy-btn,body.dark .ultra-copy-btn{background:#263258!impo
 .v92-pdf-btn{margin-left:7px}
 @media(max-width:640px){.v92-user-action{min-width:32px;width:32px}.v92-pdf-btn{margin-left:3px}}
 
+
+/* v93 - User Management confirmation modal */
+.v93-account-delete-overlay{z-index:20000;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.v93-account-delete-modal{max-width:440px;width:min(440px,calc(100vw - 32px));padding:28px;text-align:left;border:1px solid rgba(185,195,224,.35);box-shadow:0 28px 85px #0b184a55;border-radius:22px}
+.v93-delete-icon{width:52px;height:52px;display:grid;place-items:center;color:#bf455c;background:#fff0f3;border-radius:16px;margin-bottom:18px}
+.v93-account-delete-modal h2{font-size:20px;margin:0 0 11px;font-weight:750}
+.v93-delete-description{font-size:14px;line-height:1.65;margin:0 0 14px}
+.v93-delete-username{font-weight:800;overflow-wrap:anywhere}
+.v93-delete-note{font-size:12px;line-height:1.6;color:#7d6570;background:#fff5f6;border:1px solid #f7dfe5;padding:12px 14px;border-radius:12px}
+.v93-delete-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:23px;flex-wrap:wrap}
+.v93-delete-actions .btn{min-width:120px;padding:11px 16px}
+.v93-delete-confirm{background:#cf4d64!important;color:white!important}
+.v93-delete-confirm:hover{background:#b83e55!important}
+.dark .v93-delete-icon{background:#432938;color:#ff8da5}
+.dark .v93-delete-note{background:#38273b;border-color:#634057;color:#f1c4d1}
+@media(max-width:520px){.v93-delete-actions .btn{flex:1}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -3576,7 +3592,13 @@ async function v92DeleteUserClick(button){
  const id=button?.dataset?.accountId,username=button?.dataset?.accountName;
  if(!id||!canAction('Administration','Delete'))return notify('Delete permission required.');
  if(String(username).toLowerCase()==='admin')return notify('Primary Superadmin cannot be deleted.');
- if(!window.confirm('Delete the login account '+String(username).toUpperCase()+'?\n\nThis removes its system login only. Team Management member data will be kept.'))return;
+ // Use an in-app confirmation dialog instead of a browser confirm popup.
+ v93OpenDeleteDialog(button, id, username);
+ return;
+}
+async function v93ConfirmDeleteUser(button,id){
+ if(!button||!id||!canAction('Administration','Delete'))return;
+ v93CloseDeleteDialog();
  button.disabled=true;
  try{
    await accountAdminRequest({action:'delete_user',user_id:id});
@@ -3585,6 +3607,34 @@ async function v92DeleteUserClick(button){
    if(typeof fetchAccountDirectory==='function')await fetchAccountDirectory();
    render();
  }catch(err){button.disabled=false;notify('Could not delete account: '+String(err?.message||err))}
+}
+
+let v93DeleteDialog=null;
+function v93CloseDeleteDialog(){
+ if(v93DeleteDialog){v93DeleteDialog.remove();v93DeleteDialog=null}
+ document.removeEventListener('keydown',v93DeleteEscape);
+}
+function v93DeleteEscape(e){if(e.key==='Escape')v93CloseDeleteDialog()}
+function v93OpenDeleteDialog(sourceButton, accountId, username){
+ v93CloseDeleteDialog();
+ const overlay=document.createElement('div');
+ overlay.className='overlay v93-account-delete-overlay';
+ overlay.setAttribute('role','presentation');
+ overlay.innerHTML=`<div class="modal v93-account-delete-modal" role="alertdialog" aria-modal="true" aria-labelledby="v93-delete-title" aria-describedby="v93-delete-description">
+  <div class="v93-delete-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6"/></svg></div>
+  <h2 id="v93-delete-title">Delete Login Account?</h2>
+  <p id="v93-delete-description" class="v93-delete-description">Are you sure you want to delete <strong class="v93-delete-username"></strong>?</p>
+  <div class="v93-delete-note">This action removes the user's login access only. Their Team Management member record will remain unchanged.</div>
+  <div class="v93-delete-actions"><button type="button" class="btn ghost v93-delete-cancel">Cancel</button><button type="button" class="btn v93-delete-confirm">Delete Account</button></div>
+ </div>`;
+ overlay.querySelector('.v93-delete-username').textContent=String(username||'').toUpperCase();
+ overlay.querySelector('.v93-delete-cancel').addEventListener('click',v93CloseDeleteDialog);
+ overlay.querySelector('.v93-delete-confirm').addEventListener('click',()=>v93ConfirmDeleteUser(sourceButton,accountId));
+ overlay.addEventListener('click',e=>{if(e.target===overlay)v93CloseDeleteDialog()});
+ document.addEventListener('keydown',v93DeleteEscape);
+ document.body.appendChild(overlay);
+ v93DeleteDialog=overlay;
+ overlay.querySelector('.v93-delete-cancel').focus();
 }
 // Display paired logins (one row per Login) from a permission-scoped Supabase RPC.
 async function v92RefreshLoginHistory(){
