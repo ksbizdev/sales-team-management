@@ -3017,4 +3017,102 @@ logout=async function(){
   return v80OriginalLogout();
 };
 
+
+
+/* v81: reliable session restoration and accessible recovery actions.
+   Never trap users in the non-interactive restoring shell. */
+let v81RecoveryBusy=false;
+const v81RestoreShell=showRestoringShell;
+showRestoringShell=function(message='Restoring your session…',action=''){
+  v81RestoreShell(message,action);
+  if(action){
+    const panel=document.querySelector('.restoring-panel');
+    if(panel){
+      const spinner=panel.querySelector('.restoring-spinner');
+      if(spinner)spinner.style.display='none';
+      const btn=document.createElement('button');
+      btn.className='btn ghost sm';
+      btn.textContent='Sign in again';
+      btn.style.marginLeft='10px';
+      btn.onclick=v81ReturnToLogin;
+      panel.appendChild(btn);
+    }
+  }
+};
+function v81ReturnToLogin(){
+  v81RecoveryBusy=false;
+  salesAuthAccessToken=null;salesAuthRefreshToken=null;salesAuthExpiresAt=0;
+  salesRestrictedProfile=null;sessionUser=null;cloudReady=false;
+  stopCloudPolling();clearSalesSession();
+  render();
+}
+function v81Timeout(promise,ms){
+  let id;
+  const failure=new Promise((_,reject)=>{id=setTimeout(()=>reject(new Error('Connection timed out. You can retry or sign in again.')),ms)});
+  return Promise.race([promise,failure]).finally(()=>clearTimeout(id));
+}
+restoreSalesSession=async function(){
+  if(v81RecoveryBusy)return;
+  let stored=null;
+  try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}
+  if(!stored?.refresh_token){v81ReturnToLogin();return;}
+  v81RecoveryBusy=true;
+  salesAuthRefreshToken=stored.refresh_token;
+  salesAuthAccessToken=stored.access_token||null;
+  salesAuthExpiresAt=Number(stored.expires_at||0);
+  showRestoringShell('Restoring your session…');
+  try{
+    await v81Timeout((async()=>{
+      if(!salesAuthAccessToken||Date.now()>salesAuthExpiresAt-90000)await renewSalesSession();
+      let isPrimary=false;
+      try{
+        const info=await salesSessionRequest('me');
+        isPrimary=Boolean(info.primary);
+      }catch(err){
+        // Older sessions can fail the session metadata endpoint while their
+        // actual Supabase JWT is still valid. RLS alone decides workspace access.
+        console.warn('Session metadata request failed; checking scoped access:',err);
+        try{
+          await loadCloudWorkspace();
+          isPrimary=true;
+        }catch(workspaceErr){
+          if(/401|jwt|expired|unauthoriz|token/i.test(String(workspaceErr.message||''))&&salesAuthRefreshToken){
+            await renewSalesSession();
+            await loadCloudWorkspace();
+            isPrimary=true;
+          }
+        }
+      }
+      if(isPrimary){
+        if(!cloudReady)await loadCloudWorkspace();
+        salesRestrictedProfile=null;
+        sessionUser='admin';role='Admin';actor=0;
+        restoreSalesView();startCloudPolling();saveSalesSession();render();
+        if(typeof fetchAccountDirectory==='function')fetchAccountDirectory().catch(e=>console.warn('Account list refresh:',e));
+        Promise.resolve().then(()=>refreshUltranetPermission()).catch(e=>console.warn('Ultranet permission refresh:',e));
+      }else{
+        await loadRestrictedSession();
+        saveSalesSession();
+      }
+    })(),15000);
+  }catch(e){
+    console.warn('Session restore failed (recovery available):',e);
+    salesRestrictedProfile=null;sessionUser=null;
+    const message=/expired|invalid refresh|invalid session|unauthoriz|401/i.test(String(e.message||''))
+      ? 'Your saved session has expired. Sign in again to continue.'
+      : 'Could not restore your session. Retry or sign in again.';
+    showRestoringShell(message,'Retry connection');
+  }finally{v81RecoveryBusy=false;}
+};
+retrySalesSession=async function(){
+  if(v81RecoveryBusy)return;
+  await restoreSalesSession();
+};
+initializeSalesUI=function(){
+  let stored=null;
+  try{stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null')}catch(e){}
+  if(stored?.refresh_token){showRestoringShell('Restoring your session…');restoreSalesSession();}
+  else render();
+};
+
 </script></body></html>
