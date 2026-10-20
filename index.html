@@ -3822,12 +3822,28 @@ saveAdminAccount=async function(){
  if(editing&&!account)return showModalError('Account not found.');
  if(!branches.length)return showModalError('Select Branch Access.');
  if(roleName==='Superadmin'&&!account)return showModalError('Superadmin is a protected role.');
+ // Every module must be sent, including modules with ZERO checked actions.
+ // Otherwise the server deletes previous overrides but restores role-default ticks on reload.
  const permissions=readPermissions();
+ for(const moduleName of modules)if(!Object.prototype.hasOwnProperty.call(permissions,moduleName))permissions[moduleName]=[];
  const button=document.getElementById('categoryCreateButton');if(button)button.disabled=true;
  try{
    await accountAdminRequest({action:editing?'update_admin':'create_admin',user_id:account?.id,full_name:name,username,password,role:roleName,branches,permissions});
+   // Read back effective grants from Supabase, rather than assuming a 200 response means saved.
+   const refreshed=await accountAdminRequest({action:'list'});
+   if(!Array.isArray(refreshed.accounts))throw Error('Could not verify saved permissions.');
+   adminAccountDirectory=refreshed.accounts;
+   adminDirectoryHasLoaded=true;adminDirectoryLastLoad=Date.now();
+   const saved=adminAccountDirectory.find(x=>editing?x.id===account.id:String(x.username).toLowerCase()===username);
+   if(!saved)throw Error('Saved account is missing from the server response.');
+   const effective=v97EffectiveAdminPermissions(saved);
+   const mismatched=modules.some(m=>{
+     const expected=new Set(permissions[m]||[]),actual=new Set(effective[m]||[]);
+     return expected.size!==actual.size||[...expected].some(a=>!actual.has(a));
+   });
+   if(mismatched)throw Error('Server permissions do not match the selected checkboxes. Please check the permissions service.');
    log(editing?'Edit Admin':'Add Admin',`${editing?'Updated':'Created'} ${username}: role ${roleName}`);
-   modal='';editingAdminAccountId=null;accountCategory='Admin';await fetchAccountDirectory();render();
+   modal='';editingAdminAccountId=null;accountCategory='Admin';render();
  }catch(err){showModalError(`Could not ${editing?'update':'create'} Admin: ${err?.message||'Account service unavailable'}`);}
  finally{if(button?.isConnected)button.disabled=false;}
 };
