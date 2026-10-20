@@ -1207,6 +1207,17 @@ body.starlight .ultra-copy-btn,body.dark .ultra-copy-btn{background:#263258!impo
 html.v94-team-no-ic #teamResults .team-list-table thead th:nth-child(3),
 html.v94-team-no-ic #teamResults .team-list-table tbody tr:not(.team-group-divider) td:nth-child(3){display:none!important}
 .ic-permission-col{min-width:85px;text-align:center}
+
+/* v97 Admin account editor — two aligned input columns and a full-width permission matrix */
+.v97-admin-account-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 18px;align-items:start}
+.v97-admin-account-form>div{min-width:0}
+.v97-admin-account-form>.v97-full-name,.v97-admin-account-form>.v97-permission-area{grid-column:1/-1}
+.v97-admin-account-form input,.v97-admin-account-form select{width:100%;box-sizing:border-box}
+.v97-permission-area{margin-top:3px}
+.v97-permission-area h3{margin:4px 0 10px}
+.v97-permission-area .permission-table-wrap{max-width:100%;overflow-x:auto}
+.v97-permission-area #v97-permissions-note{font-size:12px;line-height:1.45;margin-top:8px}
+@media(max-width:680px){.v97-admin-account-form{grid-template-columns:minmax(0,1fr)}.v97-admin-account-form>.v97-full-name,.v97-admin-account-form>.v97-permission-area{grid-column:1}}
 </style></head><body><div id="root"></div><script>
 
 // v55: independently accessible horizontal rail; scrollbars remain usable at the TOP of each chart.
@@ -1419,7 +1430,7 @@ function renderBranchHierarchy(){
   }).filter(Boolean).join('');
   return charts||'<div class="empty">No members in this branch.</div>';
 }
-function backToDetails(){modal='details';memberModalError='';render()}function openDetails(id){selected=id;modal='details';memberModalError='';render()}function openAdd(){if(!canAction('Team Management','Add'))return notify('Access denied.');selected=null;modal='add';render()}function openEdit(id){selected=id;modal='edit';render()}function closeModal(){modal='';render()}function modalHTML(){let p=byId(selected),title={details:'Member Details',add:'Add Member',edit:'Edit Member',transfer:'Transfer Team',rolechange:'Change Role',delete:'Delete Member',inactiveConfirm:'Confirm Inactive',inactiveTransfers:'Transfer Direct Reports',account:'Create Login Account',resetpass:'Reset Password',branchEdit:'Edit Branch'}[modal]||modal;return `<div class="overlay" onclick="if(event.target===this && !['add','edit','ultranetEdit'].includes(modal))closeModal()"><div class="modal ${['account','permissions'].includes(modal)?'wide-modal':''} ${['add','edit'].includes(modal)?'member-editor-modal':''}"><div class="toolbar" style="justify-content:space-between"><div class="toolbar">${['edit','transfer'].includes(modal)?`<button class="btn ghost sm" onclick="backToDetails()">← Back</button>`:''}<h2>${title}</h2></div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>${modal==='inactiveTransfers'?inactiveTransferForm(p):modal==='resetpass'?passwordResetForm():modal==='branchEdit'?branchEditor():modal==='details'?details(p):modal==='add'||modal==='edit'?form(p):modal==='transfer'?transferForm(p):modal==='rolechange'?roleForm(p):modal==='delete'?deleteForm(p):modal==='inactiveConfirm'?`<p>Set <b>${esc(p.name)}</b> to Inactive?</p><div class="notice">This will disable their Login Account. The member record and history are retained.</div><div class="actions"><button class="btn danger" onclick="confirmInactive(${p.id})">Confirm Inactive</button><button class="btn ghost" onclick="backToDetails()">← Back to Details</button></div>`:modal==='account'?accountForm(p):''}</div></div>`}function details(p){return `${memberModalError?`<div class="notice error-notice">${esc(memberModalError)}<div class="actions" style="margin-top:10px">${children(p.id).map(c=>`<button class="btn ghost sm" onclick="openDetails(${c.id})">View ${esc(c.name)} →</button>`).join('')}</div></div>`:''}<div class="muted">Member #${p.id} &nbsp; <span class="pill ${p.status==='Inactive'?'off':''}">${p.status}</span></div><div class="formgrid">${[['Full Name',p.name],...(canViewICNumber('Team Management')?[['IC No.',ic(p)]]:[]),['Branch',memberBranchText(p)],['Role',p.role],['Reporting To',p.parent!=null?(byId(p.parent)?.name||'Not assigned'):'Not assigned']].map(x=>`<div><label>${x[0]}</label><div class="field">${esc(x[1])}</div></div>`).join('')}</div>${p.status==='Inactive'?`<div class="notice">Inactive member is read-only.${role==='Admin'?' Reactivate before editing.':''}</div>`:''}<div class="actions">${canEdit(p)?`<button class="btn secondary sm" onclick="modal='edit';render()">Edit</button>${(role==='Admin'||role==='Manager')&&p.role!=='Manager'?`<button class="btn secondary sm" onclick="modal='transfer';render()">Transfer</button>`:''}<button class="btn danger sm" onclick="setInactive(${p.id})">Set Inactive</button>`:''}${role==='Admin'&&p.status==='Inactive'?`<button class="btn secondary sm" onclick="reactivate(${p.id})">Reactivate</button><button class="btn danger sm" onclick="modal='delete';render()">Delete</button>`:''}</div>`}function form(p){let isAdd=!p,roles=role==='Admin'?['Manager','Leader','Member']:role==='Manager'?['Leader','Member']:['Member'];return `<form id="member-edit-form" onsubmit="saveMember(event)"><div class="formgrid member-editor-grid"><div class="member-editor-fullname"><label>Full Name *</label><input name="name" required value="${esc(p?.name||'')}"></div>${canViewICNumber('Team Management')?`<div class="member-editor-ic"><label>IC No. *</label><input name="ic" required value="${esc(p?.ic||'')}"></div>`:''}<div><label>Branch *</label><div id="member-branch-control">${branchInputFor(p?.role||roles[0],p)}</div></div><div><label>Role *</label><select name="role" onchange="switchBranchInputs(this)">${option(p?[...new Set([p.role,...roles])]:roles,p?.role||roles[0])}</select></div>${(role==='Admin'||(p&&canEdit(p)))?`<div id="member-reporting-picker" class="reporting-picker member-editor-reporting" style="${(p?.role||roles[0])==='Manager'?'display:none':''}"><label for="reporting-search">Reporting To</label><input type="hidden" name="parent" value="${p?.parent??''}"><input id="reporting-search" class="reporting-input" type="text" autocomplete="off" placeholder="Search name..." value="${esc(byId(p?.parent)?.name||'')}" onfocus="openReportingPicker()" oninput="onReportingInput()"><span class="reporting-chevron">⌄</span><div id="reporting-results" class="reporting-results" hidden></div></div>`:''}</div><div class="notice">${isAdd?'':'Role can be updated here subject to reporting and permission rules.'}</div><div class="actions"><button type="submit" class="btn">Save Member</button><button type="button" class="btn ghost" onclick="modal==='edit'?backToDetails():closeModal()">${modal==='edit'?'← Back to Details':'Cancel'}</button></div><div class="member-save-error" id="member-save-error" role="alert"></div></form>`}function saveMember(e){
+function backToDetails(){modal='details';memberModalError='';render()}function openDetails(id){selected=id;modal='details';memberModalError='';render()}function openAdd(){if(!canAction('Team Management','Add'))return notify('Access denied.');selected=null;modal='add';render()}function openEdit(id){selected=id;modal='edit';render()}function closeModal(){modal='';render()}function modalHTML(){let p=byId(selected),title={details:'Member Details',add:'Add Member',edit:'Edit Member',transfer:'Transfer Team',rolechange:'Change Role',delete:'Delete Member',inactiveConfirm:'Confirm Inactive',inactiveTransfers:'Transfer Direct Reports',account:'Create Login Account',resetpass:'Reset Password',branchEdit:'Edit Branch'}[modal]||modal;return `<div class="overlay" onclick="if(event.target===this && !['add','edit','ultranetEdit'].includes(modal))closeModal()"><div class="modal ${['account','permissions'].includes(modal)?'wide-modal':''} ${['add','edit'].includes(modal)?'member-editor-modal':''}"><div class="toolbar" style="justify-content:space-between"><div class="toolbar">${['edit','transfer'].includes(modal)?`<button class="btn ghost sm" onclick="backToDetails()">← Back</button>`:''}<h2>${title}</h2></div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>${modal==='inactiveTransfers'?inactiveTransferForm(p):modal==='resetpass'?passwordResetForm():modal==='branchEdit'?branchEditor():modal==='details'?details(p):modal==='add'||modal==='edit'?form(p):modal==='transfer'?transferForm(p):modal==='rolechange'?roleForm(p):modal==='delete'?deleteForm(p):modal==='inactiveConfirm'?`<p>Set <b>${esc(p.name)}</b> to Inactive?</p><div class="notice">This will disable their Login Account. The member record and history are retained.</div><div class="actions"><button class="btn danger" onclick="confirmInactive(${p.id})">Confirm Inactive</button><button class="btn ghost" onclick="backToDetails()">← Back to Details</button></div>`:modal==='account'?accountForm(p):''}</div></div>`}function details(p){return `${memberModalError?`<div class="notice error-notice">${esc(memberModalError)}<div class="actions" style="margin-top:10px">${children(p.id).map(c=>`<button class="btn ghost sm" onclick="openDetails(${c.id})">View ${esc(c.name)} →</button>`).join('')}</div></div>`:''}<div class="muted">Member #${p.id} &nbsp; <span class="pill ${p.status==='Inactive'?'off':''}">${p.status}</span></div><div class="formgrid">${[['Full Name',p.name],...(canViewICNumber('Team Management')?[['IC No.',ic(p)]]:[]),['Branch',memberBranchText(p)],['Role',p.role],['Reporting To',p.parent!=null?(byId(p.parent)?.name||'Not assigned'):'Not assigned']].map(x=>`<div><label>${x[0]}</label><div class="field">${esc(x[1])}</div></div>`).join('')}</div>${p.status==='Inactive'?`<div class="notice">Inactive member is read-only.${role==='Admin'?' Reactivate before editing.':''}</div>`:''}<div class="actions">${canEdit(p)?`<button class="btn secondary sm" onclick="modal='edit';render()">Edit</button>${(role==='Admin'||role==='Manager')&&p.role!=='Manager'?`<button class="btn secondary sm" onclick="modal='transfer';render()">Transfer</button>`:''}<button class="btn danger sm" onclick="setInactive(${p.id})">Set Inactive</button>`:''}${role==='Admin'&&p.status==='Inactive'?`<button class="btn secondary sm" onclick="reactivate(${p.id})">Reactivate</button><button class="btn danger sm" onclick="modal='delete';render()">Delete</button>`:''}</div>`}function form(p){let isAdd=!p,roles=role==='Admin'?['Manager','Leader','Member']:role==='Manager'?['Leader','Member']:['Member'];return `<form id="member-edit-form" onsubmit="saveMember(event)"><div class="formgrid member-editor-grid"><div class="member-editor-fullname"><label>Full Name *</label><input name="name" required value="${esc(p?.name||'')}"></div>${(canViewICNumber('Team Management')||(isAdd&&salesRestricted()&&canAction('Team Management','Add')))?`<div class="member-editor-ic"><label>IC No. *</label><input name="ic" required value="${esc(p?.ic||'')}"></div>`:''}<div><label>Branch *</label><div id="member-branch-control">${branchInputFor(p?.role||roles[0],p)}</div></div><div><label>Role *</label><select name="role" onchange="switchBranchInputs(this)">${option(p?[...new Set([p.role,...roles])]:roles,p?.role||roles[0])}</select></div>${(role==='Admin'||(p&&canEdit(p)))?`<div id="member-reporting-picker" class="reporting-picker member-editor-reporting" style="${(p?.role||roles[0])==='Manager'?'display:none':''}"><label for="reporting-search">Reporting To</label><input type="hidden" name="parent" value="${p?.parent??''}"><input id="reporting-search" class="reporting-input" type="text" autocomplete="off" placeholder="Search name..." value="${esc(byId(p?.parent)?.name||'')}" onfocus="openReportingPicker()" oninput="onReportingInput()"><span class="reporting-chevron">⌄</span><div id="reporting-results" class="reporting-results" hidden></div></div>`:''}</div><div class="notice">${isAdd?'':'Role can be updated here subject to reporting and permission rules.'}</div><div class="actions"><button type="submit" class="btn">Save Member</button><button type="button" class="btn ghost" onclick="modal==='edit'?backToDetails():closeModal()">${modal==='edit'?'← Back to Details':'Cancel'}</button></div><div class="member-save-error" id="member-save-error" role="alert"></div></form>`}function saveMember(e){
  e?.preventDefault?.();
  const f=document.getElementById('member-edit-form');
  if(!f)return memberFormError('Edit form is unavailable. Please reopen it.');
@@ -2824,7 +2835,7 @@ const v75PriorLogout=logout;
 logout=async function(){salesRestrictedProfile=null;return v75PriorLogout()};
 const v75HasModule=hasModule,v75CanAction=canAction,v75AssignedScope=assignedBranchAccess,v75Visible=visible;
 hasModule=function(m){if(!salesRestricted())return v75HasModule(m);return (salesRestrictedProfile.permissions?.[m]||[]).includes('View')};
-canAction=function(m,a){if(!salesRestricted())return v75CanAction(m,a);return a==='View'&&hasModule(m)};
+canAction=function(m,a){if(!salesRestricted())return v75CanAction(m,a);return (a==='View'&&hasModule(m))||(m==='Team Management'&&['Add','Edit'].includes(a)&&(salesRestrictedProfile.permissions?.[m]||[]).includes(a));};
 assignedBranchAccess=function(moduleName){if(!salesRestricted())return v75AssignedScope(moduleName);return salesRestrictedProfile.branches||[]};
 visible=function(){if(!salesRestricted())return v75Visible();return people};
 const v75CurrentName=currentUserName;
@@ -2834,15 +2845,6 @@ cloudSchedule=function(){if(salesRestricted())return false;return v75CloudSchedu
 const v75Render=render;
 render=function(){v75Render();if(!salesRestricted())return;
  const header=document.querySelector('header.top .toolbar span.muted');if(header)header.textContent=salesRestrictedProfile.username;
- const main=document.querySelector('main.main');if(main){const content=main.querySelector('#content');if(content){
-  content.insertAdjacentHTML('afterbegin','<div class="cloud-banner" role="status">Read-only access · '+esc(salesRestrictedProfile.username)+' · '+esc((salesRestrictedProfile.branches||[]).join(', ')||'No branch assigned')+'. Actions that change records are disabled while per-user write access is being finalized.</div>');
-  content.querySelectorAll('button[onclick]').forEach(btn=>{
-   const call=btn.getAttribute('onclick')||'';
-   if(/(?:add|save|delete|remove|edit|create|transfer|changeStatus|setStatus|toggleStatus|upload|export|duplicate|archive|approve|complete|resetPassword|updatePayment|cancelRequest)\s*\(/i.test(call)){
-    btn.disabled=true;btn.title='Read-only account: changes are not enabled.';
-   }
-  });
- }}
 };
 
 /* Extra guard for modal actions in restricted preview sessions. */
@@ -2855,15 +2857,12 @@ refreshUltranetPermission=async function(){
 };
 document.addEventListener('click',function(event){
  if(!salesRestricted())return;
- const control=event.target.closest('button,[onclick]');
- if(!control)return;
+ const control=event.target.closest('button,[onclick]');if(!control)return;
  const code=control.getAttribute('onclick')||'';
- if(/(?:add|save|delete|remove|edit|create|transfer|changeStatus|setStatus|toggleStatus|upload|export|duplicate|archive|approve|complete|resetPassword|updatePayment|cancelRequest)\s*\(/i.test(code)){
-  event.preventDefault();event.stopImmediatePropagation();
-  if(typeof notify==='function')notify('Read-only access. Editing is not enabled for this account yet.');
- }
+ const permittedTeam=/\b(?:openAdd|openEdit|saveTransfer|backToDetails|setPage|closeModal)\s*\(/.test(code);
+ const forbidden=/(?:add|save|delete|remove|edit|create|transfer|changeStatus|setStatus|toggleStatus|upload|duplicate|archive|approve|complete|resetPassword|updatePayment|cancelRequest)\s*\(/i.test(code);
+ if(forbidden&&!permittedTeam){event.preventDefault();event.stopImmediatePropagation();notify('Permission required for this operation.');}
 },true);
-
 
 /* v76 user management layout: category tabs left, Create User right, no refresh control. */
 const v76PreviousUserManagement=userManagement;
@@ -3676,6 +3675,193 @@ const v94OriginalRender=render;
 render=function(){
  v94OriginalRender();
  document.documentElement.classList.toggle('v94-team-no-ic',!canViewICNumber('Team Management'));
+};
+
+
+/* v95 — Superadmin includes View IC No. as a protected, automatically granted permission.
+   Saving confirms the full template rather than attempting to downgrade a protected role. */
+fullSuperadminPermissions=function(){
+ return Object.fromEntries(modules.map(m=>[m,[...new Set([
+   ...(moduleCapabilities[m]||[]),'View','Add','Edit','Delete','Export',
+   ...(m==='Ultranet'?['View Password']:[]),
+   ...(['Team Management','Ultranet'].includes(m)?['View IC No.']:[]),
+   ...(['Team Management','Ultranet'].includes(m)?['All Branches']:[])
+ ])]]));
+};
+const v95OriginalRoleSave=saveRoleSetup;
+saveRoleSetup=function(){
+ if(roleSetupSelected!=='Superadmin')return v95OriginalRoleSave();
+ ensureSuperadminRole();
+ storeRoleTemplates();
+ if(modal==='rolePermissionEdit')modal='';
+ roleSetupScreen='listing';
+ render();
+};
+const v95OriginalRoleModal=modalHTML;
+modalHTML=function(){
+ const html=v95OriginalRoleModal();
+ if(modal!=='rolePermissionEdit'||roleSetupSelected!=='Superadmin')return html;
+ return html.replaceAll('class="permcheck" type="checkbox"','class="permcheck" type="checkbox" disabled');
+};
+ensureSuperadminRole();
+
+
+/* v96 — Scoped Team Management mutations for non-primary authenticated users. */
+const v96PriorSaveMember=saveMember;
+const v96PriorSaveTransfer=saveTransfer;
+function v96TeamMemberPayload(){
+ const f=document.getElementById('member-edit-form');if(!f)throw Error('Member form not found.');
+ const action=modal==='add'?'add':'edit',previous=action==='edit'?byId(selected):null;
+ const r=f.querySelector('[name="role"]')?.value;
+ const bs=r==='Member'?[f.querySelector('[name="branch"]')?.value].filter(Boolean):[...f.querySelectorAll('input[name="branches"]:checked')].map(n=>n.value);
+ const name=(f.querySelector('[name="name"]')?.value||'').trim();
+ const parent=r==='Manager'?null:Number(f.querySelector('[name="parent"]')?.value||0)||null;
+ if(!name)throw Error('Full Name is required.');
+ if(!bs.length)throw Error('Select a Branch.');
+ if(r!=='Manager'&&!parent)throw Error('Select Reporting To.');
+ const payload={...(previous?{id:previous.id}:{}),name,role:r,branch:bs[0],branches:bs,parent};
+ const icField=f.querySelector('[name="ic"]');
+ if(icField){payload.ic=icField.value.trim();if(!payload.ic)throw Error('IC No. is required.');}
+ if(action==='add'&&!icField)throw Error('IC No. is required for a new member.');
+ return {operation:action,member:payload};
+}
+async function v96TeamMemberRequest(request){
+ if(!salesRestricted())throw Error('This action is for restricted user accounts only.');
+ const result=await cloudRequest('/rest/v1/rpc/sales_team_member_change',{method:'POST',body:JSON.stringify({p_operation:request.operation,p_member:request.member,p_remaining_ids:request.remainingIds||[],p_remaining_parent:request.remainingParent||null})});
+ if(!result?.ok)throw Error('Unable to save member.');
+ const snap=await salesSessionRequest('snapshot');
+ salesRestrictedProfile=snap.profile;cloudApply(snap.payload);cloudVersion=Number(snap.version||0);
+ return result;
+}
+saveMember=async function(e){
+ if(!salesRestricted())return v96PriorSaveMember(e);
+ e?.preventDefault?.();
+ const operation=modal==='add'?'Add':'Edit';
+ if(!canAction('Team Management',operation))return memberFormError('Team Management '+operation+' permission required.');
+ const submit=document.querySelector('#member-edit-form button[type="submit"]');if(submit)submit.disabled=true;
+ try{
+  const payload=v96TeamMemberPayload();
+  const result=await v96TeamMemberRequest(payload);
+  const p=byId(result.id);
+  modal='';selected=null;page='Team Management';view='List';
+  if(p?.branch)branchFilter=p.branch;
+  statusFilter='Active';roleFilter='All';search='';columnFilters={};filterPopup=null;
+  render();
+  const banner=document.createElement('div');banner.className='member-list-toast';banner.textContent='Member saved successfully';document.body.appendChild(banner);setTimeout(()=>banner.remove(),2600);
+ }catch(error){memberFormError(String(error.message||error));}
+ finally{if(submit)submit.disabled=false;}
+};
+saveTransfer=async function(id){
+ if(!salesRestricted())return v96PriorSaveTransfer(id);
+ if(!canAction('Team Management','Edit'))return notify('Team Management Edit permission required.');
+ const p=byId(id),next=byId(Number(document.getElementById('newParent')?.value));
+ if(!p||!next)return notify('Select a valid reporting Manager or Leader.');
+ const mode=document.getElementById('carryMode')?.value||'all';
+ const remaining=children(id).filter(c=>mode==='none'||(mode==='selected'&&!document.querySelector(`.carry[value="${c.id}"]`)?.checked)).map(c=>c.id);
+ const remainingParent=remaining.length?Number(document.getElementById('remainingParent')?.value):null;
+ const button=document.querySelector('.modal .actions .btn:not(.ghost)');if(button)button.disabled=true;
+ try{
+  await v96TeamMemberRequest({operation:'transfer',member:{id,parent:next.id},remainingIds:remaining,remainingParent});
+  modal='';selected=null;page='Team Management';render();
+  const toast=document.createElement('div');toast.className='member-list-toast';toast.textContent='Team transferred successfully';document.body.appendChild(toast);setTimeout(()=>toast.remove(),2800);
+ }catch(error){notify(String(error.message||error));}
+ finally{if(button)button.disabled=false;}
+};
+// Reporting changes in the Member editor use the same Edit endpoint.
+// Scoped users cannot delete members or modify other modules through these permissions.
+
+
+/* v97 — Admin: editable personal permissions with role defaults, paired fields. */
+function v97EffectiveAdminPermissions(account){
+ const values=roleTemplate(account?.role||'Admin');
+ const overrides=account?.permission_overrides||[];
+ if(!overrides.length)return values;
+ const answer=JSON.parse(JSON.stringify(values));
+ for(const o of overrides){
+  const label=String(o.action||'').replace(/_/g,' ').replace(/\b\w/g,x=>x.toUpperCase()).replace('Ic No','IC No.');
+  const moduleName=o.module;
+  if(!modules.includes(moduleName))continue;
+  answer[moduleName]??=[];
+  answer[moduleName]=answer[moduleName].filter(x=>x!==label);
+  if(o.allowed)answer[moduleName].push(label);
+ }
+ return answer;
+}
+function v97AdminRoleChanged(){
+ const selected=document.getElementById('newAdminRole')?.value||'Admin';
+ const host=document.getElementById('v97-admin-permissions');
+ if(host)host.innerHTML=permissionEditor(roleTemplate(selected));
+ const tip=document.getElementById('v97-permissions-note');
+ if(tip)tip.textContent='Role defaults applied. You can manually tick or untick permissions for this user before saving.';
+}
+v73AdminForm=function(account){
+ const editing=Boolean(account);
+ const selectedRole=account?.role||'Admin';
+ const perms=v97EffectiveAdminPermissions(account);
+ return `<div class="v97-admin-account-form">
+  <div class="v97-full-name"><label for="newAdminFullName">Full Name *</label><input id="newAdminFullName" autocomplete="name" placeholder="Enter Full Name" oninput="this.value=this.value.toUpperCase()" value="${esc(account?.full_name||'')}"></div>
+  <div><label for="newAdminUserId">User ID *</label><input id="newAdminUserId" autocomplete="off" placeholder="Enter User ID" oninput="this.value=this.value.toUpperCase()" value="${esc(account?.username||'')}"></div>
+  <div><label for="newAdminPassword">${editing?'New Password (optional)':'Password *'}</label><input id="newAdminPassword" type="password" autocomplete="new-password" placeholder="${editing?'Leave blank to keep password':'Enter Password'}"></div>
+  <div><label for="newAdminRole">Role *</label><select id="newAdminRole" onchange="v97AdminRoleChanged()">${v73AdminRoleOptions(selectedRole)}</select></div>
+  <div><label>Branch Access *</label>${v73BranchOptions(account?.branches)}</div>
+  <div class="v97-permission-area"><h3>Module Permissions</h3><div id="v97-admin-permissions">${permissionEditor(perms)}</div><p class="muted" id="v97-permissions-note">Permissions follow the selected Role by default. Manual changes override the defaults for this user only.</p></div>
+ </div>
+ <div class="actions" style="margin-top:18px"><button class="btn" id="categoryCreateButton" onclick="saveAdminAccount()">${editing?'Save Changes':'Create Admin'}</button><button class="btn ghost" onclick="closeModal()">Cancel</button></div>`;
+};
+saveAdminAccount=async function(){
+ const editing=modal==='v73AdminEdit';
+ const account=editing?adminAccountDirectory.find(a=>a.id===editingAdminAccountId&&a.category==='Admin'):null;
+ const name=(document.getElementById('newAdminFullName')?.value||'').trim();
+ const username=(document.getElementById('newAdminUserId')?.value||'').trim().toLowerCase();
+ const password=document.getElementById('newAdminPassword')?.value||'';
+ const roleName=document.getElementById('newAdminRole')?.value||'Admin';
+ const branches=[...document.querySelectorAll('[data-admin-branch]:checked')].map(c=>c.dataset.adminBranch);
+ if(!name)return showModalError('Full Name is required.');
+ if(!/^[a-z0-9][a-z0-9._-]{2,59}$/.test(username))return showModalError('Invalid User ID.');
+ if(!editing&&!password)return showModalError('Password is required.');
+ if(editing&&!account)return showModalError('Account not found.');
+ if(!branches.length)return showModalError('Select Branch Access.');
+ if(roleName==='Superadmin'&&!account)return showModalError('Superadmin is a protected role.');
+ const permissions=readPermissions();
+ const button=document.getElementById('categoryCreateButton');if(button)button.disabled=true;
+ try{
+   await accountAdminRequest({action:editing?'update_admin':'create_admin',user_id:account?.id,full_name:name,username,password,role:roleName,branches,permissions});
+   log(editing?'Edit Admin':'Add Admin',`${editing?'Updated':'Created'} ${username}: role ${roleName}`);
+   modal='';editingAdminAccountId=null;accountCategory='Admin';await fetchAccountDirectory();render();
+ }catch(err){showModalError(`Could not ${editing?'update':'create'} Admin: ${err?.message||'Account service unavailable'}`);}
+ finally{if(button?.isConnected)button.disabled=false;}
+};
+// Restricted authenticated roles use actual module grants for Add/Edit/Transfer,
+// not the legacy UI's hard-coded member hierarchy role.
+const v97OriginalCanEdit=canEdit;
+canEdit=function(p){return salesRestricted()?Boolean(p&&p.status==='Active'&&canAction('Team Management','Edit')):v97OriginalCanEdit(p)};
+const v97OriginalForm=form;
+form=function(p){
+ let html=v97OriginalForm(p);
+ if(!salesRestricted())return html;
+ const available=['Manager','Leader','Member'];
+ const roleChoice=p?.role||'Member';
+ // Non-primary accounts with Add/Edit grant can select the target role and supervisor.
+ html=html.replace(/<select name="role" onchange="switchBranchInputs\(this\)">[\s\S]*?<\/select>/,
+  `<select name="role" onchange="switchBranchInputs(this)">${option(available,roleChoice)}</select>`);
+ return html;
+};
+const v97OriginalTeam=team;
+team=function(){
+ let html=v97OriginalTeam();
+ if(salesRestricted()&&canAction('Team Management','Add')&&!html.includes('onclick="openAdd()"')){
+  html=html.replace('<div class="toolbar">', '<div class="toolbar"><button class="btn sm" onclick="openAdd()">+ Add Member</button>');
+ }
+ return html;
+};
+
+const v97OriginalDetails=details;
+details=function(p){
+ let html=v97OriginalDetails(p);
+ if(salesRestricted()&&p&&canAction('Team Management','Edit')&&p.status==='Active'&&p.role!=='Manager'&&!html.includes('>Transfer</button>')){
+   html=html.replace('<button class="btn danger sm" onclick="setInactive(',`<button class="btn secondary sm" onclick="modal='transfer';render()">Transfer</button><button class="btn danger sm" onclick="setInactive(`);
+ }
+ return html;
 };
 
 </script></body></html>
