@@ -3926,4 +3926,107 @@ ultranet=function(){const html=reminderPriorUltranet();return reminderEligible()
 const reminderPriorLog=log;
 log=function(action,detail){reminderPriorLog(action,detail);if(['Add Member','Edit Member','Role Change','Branch Change','Change Branch','Transfer','Transfer Team','Inactive'].includes(action)&&notices.length){const n=notices[0];const name=String(detail||'').split(':')[0].replace(/\s+set\s+Inactive\s*$/i,'').trim();const m=people.find(p=>p.name===name);if(m){n.memberId=m.id;n.memberName=m.name}n.reminderId=n.reminderId||('team-'+Date.now()+'-'+Math.random().toString(36).slice(2));persist()}};
 
+
+/* v104 — durable signed-in session and exact module/tab recovery after browser refresh
+   or a new deployment. Never bypass Supabase authentication or an explicit logout. */
+const v104PreviousRememberView=rememberSalesView;
+rememberSalesView=function(){
+  v104PreviousRememberView();
+  if(!sessionUser)return;
+  try{
+    const state=JSON.parse(localStorage.getItem(SALES_VIEW_KEY)||'{}')||{};
+    Object.assign(state,{
+      page,adminTab,theme,view,branchFilter,statusFilter,roleFilter,
+      ultranetBranch,ultranetStatus,ultranetRole,accountCategory,
+      ultranetTerm,ultranetFilter,
+      savedAt:Date.now()
+    });
+    const encoded=JSON.stringify(state);
+    localStorage.setItem(SALES_VIEW_KEY,encoded);
+    sessionStorage.setItem(SALES_VIEW_KEY,encoded);
+  }catch(err){console.warn('Could not save page location:',err)}
+};
+const v104PreviousRestoreView=restoreSalesView;
+restoreSalesView=function(){
+  // The login session is verified before recovering any restricted content.
+  v104PreviousRestoreView();
+  if(!sessionUser)return;
+  try{
+    let state=localStorage.getItem(SALES_VIEW_KEY);
+    if(!state)state=sessionStorage.getItem(SALES_VIEW_KEY);
+    if(!state)return;
+    const saved=JSON.parse(state);
+    if(!saved||typeof saved!=='object')return;
+    const candidate=String(saved.page||'');
+    if(['Dashboard','Team Management','Ultranet','Activity History','Administration'].includes(candidate)&&hasModule(candidate))page=candidate;
+    if(['User Management','Role Setup','Branch Setup','Login History'].includes(saved.adminTab))adminTab=saved.adminTab;
+    if(typeof saved.ultranetBranch==='string'&&(saved.ultranetBranch==='All'||branches.includes(saved.ultranetBranch)))ultranetBranch=saved.ultranetBranch;
+    if(['Active','Inactive','All'].includes(saved.ultranetStatus))ultranetStatus=saved.ultranetStatus;
+    if(['Manager','Leader','Member','All'].includes(saved.ultranetRole))ultranetRole=saved.ultranetRole;
+    if(typeof saved.ultranetTerm==='string')ultranetTerm=saved.ultranetTerm.slice(0,200);
+    if(saved.ultranetFilter&&typeof saved.ultranetFilter==='object'&&!Array.isArray(saved.ultranetFilter))ultranetFilter=saved.ultranetFilter;
+    if(typeof saved.accountCategory==='string')accountCategory=saved.accountCategory;
+  }catch(err){console.warn('Could not recover page location:',err)}
+};
+// v90's fresh-login shortcut must not discard a recovered location from an
+// existing browser. An explicit sign-out already removes the saved view.
+const v104PreviousLogin=login;
+login=async function(){
+  let previousLocation=null;
+  try{previousLocation=localStorage.getItem(SALES_VIEW_KEY)||sessionStorage.getItem(SALES_VIEW_KEY)}catch(e){}
+  await v104PreviousLogin();
+  if(sessionUser&&previousLocation){
+    try{
+      // The outer v90 login wrapper opens Dashboard by default; recover the
+      // saved location only after authentication and permissions are loaded.
+      localStorage.setItem(SALES_VIEW_KEY,previousLocation);
+      restoreSalesView();
+      rememberSalesView();
+      render();
+    }catch(e){console.warn('Could not recover last page after sign-in:',e)}
+  }
+};
+// A deliberate Logout must forget both copies of the saved location.
+const v104PreviousClearView=clearSalesView;
+clearSalesView=function(){
+  v104PreviousClearView();
+  try{sessionStorage.removeItem(SALES_VIEW_KEY)}catch(e){}
+};
+// When the browser reloads a new deployed HTML build, persist the current tab
+// before navigation. Do not write authentication credentials on pagehide.
+window.addEventListener('pagehide',()=>{if(sessionUser)rememberSalesView()});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'&&sessionUser)rememberSalesView();
+});
+// Multiple tabs can rotate Supabase refresh tokens. Adopt the newer saved
+// session on the next request, without replacing a still-valid access token.
+window.addEventListener('storage',event=>{
+  if(event.key!==SALES_SESSION_KEY||!event.newValue||!sessionUser)return;
+  try{
+    const next=JSON.parse(event.newValue);
+    if(!next?.refresh_token)return;
+    const expires=Number(next.expires_at||0);
+    if(expires>salesAuthExpiresAt+1000){
+      salesAuthAccessToken=next.access_token||salesAuthAccessToken;
+      salesAuthRefreshToken=next.refresh_token;
+      salesAuthExpiresAt=expires;
+    }
+  }catch(e){}
+});
+// Before attempting a rotating refresh grant, use a newer token saved by
+// another tab; this avoids treating normal cross-tab rotation as a logout.
+const v104PreviousRenewSession=renewSalesSession;
+renewSalesSession=async function(){
+  try{
+    const stored=JSON.parse(localStorage.getItem(SALES_SESSION_KEY)||'null');
+    if(stored?.refresh_token&&Number(stored.expires_at||0)>salesAuthExpiresAt+1000){
+      salesAuthRefreshToken=stored.refresh_token;
+      salesAuthAccessToken=stored.access_token||salesAuthAccessToken;
+      salesAuthExpiresAt=Number(stored.expires_at);
+      if(salesAuthAccessToken&&Date.now()<salesAuthExpiresAt-60000)return {access_token:salesAuthAccessToken};
+    }
+  }catch(e){}
+  return v104PreviousRenewSession();
+};
+
 </script></body></html>
