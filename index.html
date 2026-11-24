@@ -3900,11 +3900,20 @@ function openUltranetReminderMember(id,i){
  const n=reminderAt(i),m=byId(id);
  if(!m){notify('Member record could not be found.');return}
  if(n){const s=reminderReadSet();s.add(n._rid);reminderStoreRead(s)}
- ultranetBranch='All';ultranetTerm='';ultranetStatus='All';ultranetRole='All';ultranetFilter={};
+ // Open the member's own branch tab, retaining the full branch listing.
+ const memberTabs=memberBranches(m);
+ const preferredBranch=String(m.branch||'');
+ const targetBranch=(preferredBranch && memberTabs.includes(preferredBranch) && branches.includes(preferredBranch))
+  ? preferredBranch : memberTabs.find(b=>branches.includes(b));
+ if(!targetBranch){notify('The member has no available branch tab.');return}
+ ultranetBranch=targetBranch;ultranetTerm='';ultranetStatus='All';ultranetRole='All';ultranetFilter={};
  ultranetReminderExpanded=false;ultranetReminderShowAll=false;page='Ultranet';modal='';render();
  requestAnimationFrame(()=>requestAnimationFrame(()=>{
   const row=document.querySelector('[data-ultranet-member-id="'+Number(id)+'"]');
   if(!row){notify('Member is not visible in your Ultranet listing.');return}
+  // Keep the selected branch tab visible in the horizontally scrollable tab strip.
+  const activeTab=document.querySelector('#ultranet-branch-tabs .branch-tab.active');
+  if(activeTab)activeTab.scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'});
   row.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
   row.classList.remove('ultranet-reminder-target');
   void row.offsetWidth;
