@@ -1279,19 +1279,36 @@ document.addEventListener('click',function(e){
 });
 function updateSelectedBranchLabel(){const title=$('member-branch-summary');if(title){const selected=[...document.querySelectorAll('#member-branch-control input[name="branches"]:checked')].map(x=>x.value);title.textContent=selected.join(', ')||'Select Branches'}}
 function switchBranchInputs(select){const box=document.getElementById('member-branch-control');if(!box)return;const p=byId(selected);const previous=[...box.querySelectorAll('input[name="branches"]:checked')].map(x=>x.value);const single=box.querySelector('select[name="branch"]')?.value;const modified=p?{...p,branch:single||previous[0]||p.branch,branches:previous.length?previous:single?[single]:memberBranches(p)}:previous.length?{role:select.value,branch:previous[0],branches:previous}:{role:select.value,branch:single,branches:single?[single]:[]};box.innerHTML=branchInputFor(select.value,modified);refreshReportingOptions()}
-/* v107: Keep eligible supervisors based on the latest permission-scoped server snapshot.
-   Do not change branch/role authorization when refreshing the Reporting To picker. */
-let reportingDirectory=null,reportingDirectoryLoading=false,reportingDirectoryLoadedAt=0;
+/* v108: Restricted Admin supervisor picker must use the complete, scoped member
+   directory. An empty refresh must not erase valid local people. */
+let reportingDirectory=null,reportingDirectoryLoading=false,reportingDirectoryLoadedAt=0,reportingDirectoryError='';
+function reportingBranchCodes(p){
+ const raw=[...(Array.isArray(p?.branches)?p.branches:[]),p?.branch];
+ return [...new Set(raw.map(b=>String(b||'').trim().toUpperCase()).filter(Boolean))];
+}
 function reportingCandidateList(){
  const f=document.getElementById('member-edit-form');if(!f)return [];
  const selectedRole=String(f.querySelector('[name="role"]')?.value||'').trim();
  if(selectedRole==='Manager')return [];
- const acceptable=selectedRole==='Leader'?['Manager']:['Manager','Leader'];
- const bs=selectedRole==='Member'?[f.querySelector('#member-branch-control [name="branch"]')?.value].filter(Boolean):[...f.querySelectorAll('#member-branch-control input[name="branches"]:checked')].map(n=>n.value);
- const branchSet=new Set(bs.map(b=>String(b).trim().toUpperCase()));
- const source=Array.isArray(reportingDirectory)?reportingDirectory:people;
- return source.filter(p=>Number(p.id)!==Number(selected)&&String(p.status||'').trim().toLowerCase()==='active'&&acceptable.includes(String(p.role||'').trim())&&branchSet.size>0&&memberBranches(p).some(b=>branchSet.has(String(b).trim().toUpperCase())))
- .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+ const allowedRoles=selectedRole==='Leader'?['manager']:['manager','leader'];
+ const selectedBranches=selectedRole==='Member'
+  ?[f.querySelector('#member-branch-control select[name="branch"]')?.value]
+  :[...f.querySelectorAll('#member-branch-control input[name="branches"]:checked')].map(n=>n.value);
+ const branchSet=new Set(selectedBranches.map(b=>String(b||'').trim().toUpperCase()).filter(Boolean));
+ if(!branchSet.size)return [];
+ // Keep both sources. The server snapshot may be briefly unavailable or partially
+ // loaded; either case must not overwrite valid candidates already in people.
+ const byMemberId=new Map();
+ for(const collection of [people,reportingDirectory]){
+  if(!Array.isArray(collection))continue;
+  for(const p of collection){if(p && Number.isFinite(Number(p.id)))byMemberId.set(Number(p.id),p)}
+ }
+ return [...byMemberId.values()].filter(p=>{
+   if(modal==='edit' && Number(p.id)===Number(selected))return false;
+   if(String(p.status||'').trim().toLowerCase()!=='active')return false;
+   if(!allowedRoles.includes(String(p.role||'').trim().toLowerCase()))return false;
+   return reportingBranchCodes(p).some(b=>branchSet.has(b));
+ }).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
 }
 function refreshReportingOptions(){
  const picker=document.getElementById('member-reporting-picker');if(!picker)return;
@@ -1299,29 +1316,38 @@ function refreshReportingOptions(){
  const selectedInput=f?.querySelector('input[name="parent"]'),input=document.getElementById('reporting-search');
  const candidates=reportingCandidateList();
  picker.style.display=target==='Manager'?'none':'';
- if(selectedInput?.value&&!candidates.some(p=>String(p.id)===selectedInput.value)){selectedInput.value='';if(input)input.value='';}
+ if(selectedInput?.value&&!candidates.some(p=>String(p.id)===selectedInput.value)){
+  selectedInput.value='';if(input)input.value='';
+ }
  const query=(input?.value||'').trim().toLocaleLowerCase();
  const options=candidates.filter(p=>String(p.name||'').toLocaleLowerCase().includes(query));
  const panel=document.getElementById('reporting-results');if(!panel)return;
  const branch=f?.querySelector('#member-branch-control select[name="branch"]')?.value||[...f.querySelectorAll('#member-branch-control input[name="branches"]:checked')].map(n=>n.value).join(', ');
- panel.innerHTML=options.length?options.map(p=>`<button type="button" class="reporting-result" data-parent-id="${p.id}">${esc(p.name)}<small>${p.role==='Manager'?'Sales Manager':'Sales Team Leader'} · ${esc(memberBranchText(p))}</small></button>`).join(''):
- `<div class="reporting-empty">${esc(reportingDirectoryLoading?'Loading eligible supervisors…':query&&candidates.length?'No names match your search.':!branch?'Select a Branch first.':`No active ${target==='Leader'?'Manager':'Manager / Leader'} found for ${branch}.`)}</div>`;
+ let empty='';
+ if(reportingDirectoryLoading&&!candidates.length)empty='Loading eligible supervisors…';
+ else if(query&&candidates.length)empty='No names match your search.';
+ else if(!branch)empty='Select a Branch first.';
+ else if(reportingDirectoryError&&!candidates.length)empty='Unable to load reporting directory: '+reportingDirectoryError;
+ else if(!candidates.length)empty=`No active ${target==='Leader'?'Manager':'Manager / Leader'} found for ${branch}. Please refresh the directory.`;
+ panel.innerHTML=options.length?options.map(p=>`<button type="button" class="reporting-result" data-parent-id="${Number(p.id)}">${esc(p.name)}<small>${String(p.role).trim().toLowerCase()==='manager'?'Sales Manager':'Sales Team Leader'} · ${esc(reportingBranchCodes(p).join(', '))}</small></button>`).join(''):
+ `<div class="reporting-empty">${esc(empty)}</div>${!reportingDirectoryLoading&&!candidates.length&&salesRestricted()?'<button type="button" class="btn ghost sm" onclick="refreshReportingDirectory()">↻ Retry Load</button>':''}`;
 }
 async function refreshReportingDirectory(){
  if(!salesRestricted()||reportingDirectoryLoading)return;
- reportingDirectoryLoading=true;refreshReportingOptions();
+ reportingDirectoryLoading=true;reportingDirectoryError='';refreshReportingOptions();
  try{
   const snap=await salesSessionRequest('snapshot');
-  if(Array.isArray(snap?.payload?.people)){
-   reportingDirectory=snap.payload.people;reportingDirectoryLoadedAt=Date.now();
-  }
- }catch(err){console.warn('Reporting To directory refresh unavailable:',err);}
- finally{reportingDirectoryLoading=false;if(document.getElementById('member-reporting-picker'))refreshReportingOptions();}
+  const rows=snap?.payload?.people;
+  if(!Array.isArray(rows))throw Error('Member directory is missing from the snapshot.');
+  if(rows.length===0&&Array.isArray(people)&&people.length)throw Error('Empty member directory returned.');
+  reportingDirectory=rows;reportingDirectoryLoadedAt=Date.now();
+ }catch(err){reportingDirectoryError=String(err?.message||err);console.warn('Reporting To directory refresh failed:',err)}
+ finally{reportingDirectoryLoading=false;if(document.getElementById('member-reporting-picker'))refreshReportingOptions()}
 }
 function onReportingInput(){const h=document.querySelector('#member-edit-form input[name="parent"]');if(h)h.value='';refreshReportingOptions();const panel=document.getElementById('reporting-results');if(panel)panel.hidden=false;}
 function chooseReportingPerson(id){const p=reportingCandidateList().find(x=>String(x.id)===String(id));const h=document.querySelector('#member-edit-form input[name="parent"]'),input=document.getElementById('reporting-search');if(!p||!h||!input)return;h.value=String(p.id);input.value=p.name;document.getElementById('reporting-results').hidden=true;}
 function openReportingPicker(){refreshReportingOptions();const panel=document.getElementById('reporting-results');if(panel)panel.hidden=false;if(salesRestricted()&&(!Array.isArray(reportingDirectory)||Date.now()-reportingDirectoryLoadedAt>60000))void refreshReportingDirectory();}
-document.addEventListener('change',e=>{if(e.target.closest('#member-branch-control')){reportingDirectory=null;refreshReportingOptions();}});
+document.addEventListener('change',e=>{if(e.target.closest('#member-branch-control')){refreshReportingOptions();}});
 document.addEventListener('click',e=>{
  const item=e.target.closest('.reporting-result');if(item){chooseReportingPerson(item.dataset.parentId);return;}
  const picker=document.getElementById('member-reporting-picker');if(picker&&!picker.contains(e.target)){const p=document.getElementById('reporting-results');if(p)p.hidden=true;}
