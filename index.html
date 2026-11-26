@@ -2912,7 +2912,7 @@ const v75PriorLogout=logout;
 logout=async function(){salesRestrictedProfile=null;return v75PriorLogout()};
 const v75HasModule=hasModule,v75CanAction=canAction,v75AssignedScope=assignedBranchAccess,v75Visible=visible;
 hasModule=function(m){if(!salesRestricted())return v75HasModule(m);return (salesRestrictedProfile.permissions?.[m]||[]).includes('View')};
-canAction=function(m,a){if(!salesRestricted())return v75CanAction(m,a);return (a==='View'&&hasModule(m))||(m==='Team Management'&&['Add','Edit'].includes(a)&&(salesRestrictedProfile.permissions?.[m]||[]).includes(a));};
+canAction=function(m,a){if(!salesRestricted())return v75CanAction(m,a);const allowed=(salesRestrictedProfile.permissions?.[m]||[]).includes(a)===true;if(!allowed)return false;if(a==='View')return true;if(m==='Team Management')return ['Add','Edit','View IC No.'].includes(a);if(m==='Ultranet')return ['Add','Edit','View Password','View IC No.','Export'].includes(a);return false;};
 assignedBranchAccess=function(moduleName){if(!salesRestricted())return v75AssignedScope(moduleName);return salesRestrictedProfile.branches||[]};
 visible=function(){if(!salesRestricted())return v75Visible();return people};
 const v75CurrentName=currentUserName;
@@ -2937,8 +2937,9 @@ document.addEventListener('click',function(event){
  const control=event.target.closest('button,[onclick]');if(!control)return;
  const code=control.getAttribute('onclick')||'';
  const permittedTeam=/\b(?:openAdd|openEdit|saveTransfer|backToDetails|setPage|closeModal)\s*\(/.test(code);
+ const permittedUltranet=/^\s*(?:openUltranetEdit|saveUltranetRecord)\s*\(/.test(code)&&(canAction('Ultranet','Edit')||canAction('Ultranet','Add'));
  const forbidden=/(?:add|save|delete|remove|edit|create|transfer|changeStatus|setStatus|toggleStatus|upload|duplicate|archive|approve|complete|resetPassword|updatePayment|cancelRequest)\s*\(/i.test(code);
- if(forbidden&&!permittedTeam){event.preventDefault();event.stopImmediatePropagation();notify('Permission required for this operation.');}
+ if(forbidden&&!permittedTeam&&!permittedUltranet){event.preventDefault();event.stopImmediatePropagation();notify('Permission required for this operation.');}
 },true);
 
 /* v76 user management layout: category tabs left, Create User right, no refresh control. */
@@ -4108,4 +4109,55 @@ renewSalesSession=async function(){
   return v104PreviousRenewSession();
 };
 
+
+
+/* v110: Restricted Admin Ultranet editing uses the actual per-user permissions.
+   Unlike the original Primary Admin, restricted accounts cannot write the entire
+   workspace_state. Only a server-authorized, member-scoped RPC may save User IDs.
+   This function intentionally fails if the RPC has not been installed. */
+const v110PreviousSaveUltranetRecord=saveUltranetRecord;
+saveUltranetRecord=async function(){
+ if(!salesRestricted())return v110PreviousSaveUltranetRecord();
+ const member=byId(selected);
+ if(!member)return showModalError('Linked member not found.');
+ const current=ultranetRecords.find(x=>Number(x.memberId)===Number(selected));
+ const requiredAction=current?'Edit':'Add';
+ if(!canAction('Ultranet',requiredAction))return showModalError('Ultranet '+requiredAction+' permission required.');
+ const id=String(document.getElementById('ultraID')?.value||'').trim();
+ if(!id||id.length>100)return showModalError('Enter a User ID (maximum 100 characters).');
+ if(ultranetRecords.some(x=>Number(x.memberId)!==Number(selected)&&String(x.userId||'').toLowerCase()===id.toLowerCase()))return showModalError('User ID already exists.');
+ const pwInput=document.getElementById('ultraPW');
+ const password=pwInput?.value||'';
+ const saveButton=document.querySelector('.modal .actions button.btn');
+ if(saveButton)saveButton.disabled=true;
+ try{
+   // Never show success before the verified database operation completes.
+   const result=await cloudRequest('/rest/v1/rpc/sales_ultranet_user_id_save',{
+     method:'POST',body:JSON.stringify({p_member_id:Number(selected),p_user_id:id})
+   });
+   if(!result?.ok)throw Error('Server did not confirm the User ID change.');
+   const confirmedId=String(result.userId||'');
+   if(!confirmedId)throw Error('Server returned no User ID.');
+   const existing=ultranetRecords.find(x=>Number(x.memberId)===Number(selected));
+   if(existing)existing.userId=confirmedId;
+   else ultranetRecords.push({memberId:Number(selected),userId:confirmedId});
+   if(password){
+     if(!canViewUltranetPassword())throw Error('User ID saved; View Password permission is required to change the password.');
+     try{
+       await cloudRequest('/rest/v1/rpc/ultranet_password_write',{
+         method:'POST',body:JSON.stringify({p_member_id:Number(selected),p_password:password})
+       });
+       ultranetPasswordIds.add(Number(selected));
+     }catch(e){throw Error('User ID saved, but password could not be saved: '+String(e?.message||e));}
+   }
+   if(pwInput)pwInput.value='';
+   closeModal();
+   notify('Ultranet User ID saved successfully.');
+ }catch(err){
+   let msg=String(err?.message||err);
+   if(/sales_ultranet_user_id_save|Could not find the function|404|PGRST202/i.test(msg))
+     msg='Ultranet User ID save is not enabled on Supabase. Apply the accompanying v110 SQL setup first.';
+   showModalError(msg);
+ }finally{if(saveButton&&saveButton.isConnected)saveButton.disabled=false;}
+};
 </script></body></html>
