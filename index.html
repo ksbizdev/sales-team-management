@@ -1286,29 +1286,58 @@ function reportingBranchCodes(p){
  const raw=[...(Array.isArray(p?.branches)?p.branches:[]),p?.branch];
  return [...new Set(raw.map(b=>String(b||'').trim().toUpperCase()).filter(Boolean))];
 }
-function reportingCandidateList(){
- const f=document.getElementById('member-edit-form');if(!f)return [];
- const selectedRole=String(f.querySelector('[name="role"]')?.value||'').trim();
- if(selectedRole==='Manager')return [];
- const allowedRoles=selectedRole==='Leader'?['manager']:['manager','leader'];
- const selectedBranches=selectedRole==='Member'
-  ?[f.querySelector('#member-branch-control select[name="branch"]')?.value]
-  :[...f.querySelectorAll('#member-branch-control input[name="branches"]:checked')].map(n=>n.value);
- const branchSet=new Set(selectedBranches.map(b=>String(b||'').trim().toUpperCase()).filter(Boolean));
- if(!branchSet.size)return [];
- // Keep both sources. The server snapshot may be briefly unavailable or partially
- // loaded; either case must not overwrite valid candidates already in people.
- const byMemberId=new Map();
- for(const collection of [people,reportingDirectory]){
-  if(!Array.isArray(collection))continue;
-  for(const p of collection){if(p && Number.isFinite(Number(p.id)))byMemberId.set(Number(p.id),p)}
+/* v109: The chosen role and the actual branch input must agree.  Use the
+   same `people` rows rendered by Team Management, with the restricted snapshot
+   as a fallback only (never let sparse reloaded records replace full rows). */
+function reportingFormSelection(){
+ const f=document.getElementById('member-edit-form');
+ if(!f)return {role:'',branches:[],problem:'Member form is not available.'};
+ const currentRole=String(f.querySelector('[name="role"]')?.value||'').trim();
+ const control=f.querySelector('#member-branch-control');
+ const single=control?.querySelector('select[name="branch"]');
+ const multi=control?.querySelectorAll('input[name="branches"]:checked')||[];
+ if(currentRole==='Member'&&!single){
+  return {role:currentRole,branches:[],problem:'Branch input does not match Member role. Change Role once or reopen Add Member.'};
  }
- return [...byMemberId.values()].filter(p=>{
-   if(modal==='edit' && Number(p.id)===Number(selected))return false;
+ if(currentRole!=='Member'&&single){
+  return {role:currentRole,branches:[],problem:'Branch input does not match selected Role. Change Role once or reopen Add Member.'};
+ }
+ const branches=currentRole==='Member'?[single?.value]:[...multi].map(x=>x.value);
+ return {role:currentRole,branches:[...new Set(branches.map(b=>String(b||'').trim()).filter(Boolean))],problem:''};
+}
+function reportingCandidateList(){
+ const selection=reportingFormSelection();
+ if(selection.problem||selection.role==='Manager'||!selection.branches.length)return [];
+ const branchSet=new Set(selection.branches.map(x=>x.toUpperCase()));
+ const allowedRoles=selection.role==='Leader'?['manager']:['manager','leader'];
+ const sources=new Map();
+ // Snapshot first, current Team Management listing last: keep the data users see.
+ for(const collection of [reportingDirectory,people]){
+  if(!Array.isArray(collection))continue;
+  for(const p of collection){
+   const id=Number(p?.id);
+   if(!Number.isSafeInteger(id)||id<=0)continue;
+   const previous=sources.get(id)||{};
+   sources.set(id,{...previous,...p});
+  }
+ }
+ return [...sources.values()].filter(p=>{
+   if(modal==='edit'&&Number(p.id)===Number(selected))return false;
    if(String(p.status||'').trim().toLowerCase()!=='active')return false;
    if(!allowedRoles.includes(String(p.role||'').trim().toLowerCase()))return false;
    return reportingBranchCodes(p).some(b=>branchSet.has(b));
  }).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+}
+function reportingDirectoryDiagnosis(){
+ const rows=Array.isArray(people)?people:[];
+ const selection=reportingFormSelection();
+ if(selection.problem)return selection.problem;
+ if(!selection.branches.length)return 'Select a Branch first.';
+ const branchSet=new Set(selection.branches.map(x=>x.toUpperCase()));
+ const matchingBranch=rows.filter(p=>reportingBranchCodes(p).some(b=>branchSet.has(b)));
+ const activeSupervisors=matchingBranch.filter(p=>String(p.status||'').trim().toLowerCase()==='active'&&['manager','leader'].includes(String(p.role||'').trim().toLowerCase()));
+ const summary=`Loaded ${rows.length} team members; ${matchingBranch.length} in ${selection.branches.join(', ')}; ${activeSupervisors.length} Active Manager/Leader.`;
+ return summary+(activeSupervisors.length?' Please reopen the selector if candidates are still missing.':' Check whether the team listing has finished loading.');
 }
 function refreshReportingOptions(){
  const picker=document.getElementById('member-reporting-picker');if(!picker)return;
@@ -1328,7 +1357,7 @@ function refreshReportingOptions(){
  else if(query&&candidates.length)empty='No names match your search.';
  else if(!branch)empty='Select a Branch first.';
  else if(reportingDirectoryError&&!candidates.length)empty='Unable to load reporting directory: '+reportingDirectoryError;
- else if(!candidates.length)empty=`No active ${target==='Leader'?'Manager':'Manager / Leader'} found for ${branch}. Please refresh the directory.`;
+ else if(!candidates.length)empty=`No eligible ${target==='Leader'?'Manager':'Manager / Leader'} shown for ${branch}. ${reportingDirectoryDiagnosis()}`;
  panel.innerHTML=options.length?options.map(p=>`<button type="button" class="reporting-result" data-parent-id="${Number(p.id)}">${esc(p.name)}<small>${String(p.role).trim().toLowerCase()==='manager'?'Sales Manager':'Sales Team Leader'} · ${esc(reportingBranchCodes(p).join(', '))}</small></button>`).join(''):
  `<div class="reporting-empty">${esc(empty)}</div>${!reportingDirectoryLoading&&!candidates.length&&salesRestricted()?'<button type="button" class="btn ghost sm" onclick="refreshReportingDirectory()">↻ Retry Load</button>':''}`;
 }
@@ -1478,7 +1507,7 @@ function renderBranchHierarchy(){
   }).filter(Boolean).join('');
   return charts||'<div class="empty">No members in this branch.</div>';
 }
-function backToDetails(){modal='details';memberModalError='';render()}function openDetails(id){selected=id;modal='details';memberModalError='';render()}function openAdd(){if(!canAction('Team Management','Add'))return notify('Access denied.');reportingDirectory=null;selected=null;modal='add';render()}function openEdit(id){selected=id;modal='edit';render()}function closeModal(){modal='';render()}function modalHTML(){let p=byId(selected),title={details:'Member Details',add:'Add Member',edit:'Edit Member',transfer:'Transfer Team',rolechange:'Change Role',delete:'Delete Member',inactiveConfirm:'Confirm Inactive',inactiveTransfers:'Transfer Direct Reports',account:'Create Login Account',resetpass:'Reset Password',branchEdit:'Edit Branch'}[modal]||modal;return `<div class="overlay" onclick="if(event.target===this && !['add','edit','ultranetEdit'].includes(modal))closeModal()"><div class="modal ${['account','permissions'].includes(modal)?'wide-modal':''} ${['add','edit'].includes(modal)?'member-editor-modal':''}"><div class="toolbar" style="justify-content:space-between"><div class="toolbar">${['edit','transfer'].includes(modal)?`<button class="btn ghost sm" onclick="backToDetails()">← Back</button>`:''}<h2>${title}</h2></div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>${modal==='inactiveTransfers'?inactiveTransferForm(p):modal==='resetpass'?passwordResetForm():modal==='branchEdit'?branchEditor():modal==='details'?details(p):modal==='add'||modal==='edit'?form(p):modal==='transfer'?transferForm(p):modal==='rolechange'?roleForm(p):modal==='delete'?deleteForm(p):modal==='inactiveConfirm'?`<p>Set <b>${esc(p.name)}</b> to Inactive?</p><div class="notice">This will disable their Login Account. The member record and history are retained.</div><div class="actions"><button class="btn danger" onclick="confirmInactive(${p.id})">Confirm Inactive</button><button class="btn ghost" onclick="backToDetails()">← Back to Details</button></div>`:modal==='account'?accountForm(p):''}</div></div>`}function details(p){return `${memberModalError?`<div class="notice error-notice">${esc(memberModalError)}<div class="actions" style="margin-top:10px">${children(p.id).map(c=>`<button class="btn ghost sm" onclick="openDetails(${c.id})">View ${esc(c.name)} →</button>`).join('')}</div></div>`:''}<div class="muted">Member #${p.id} &nbsp; <span class="pill ${p.status==='Inactive'?'off':''}">${p.status}</span></div><div class="formgrid">${[['Full Name',p.name],...(canViewICNumber('Team Management')?[['IC No.',ic(p)]]:[]),['Branch',memberBranchText(p)],['Role',p.role],['Reporting To',p.parent!=null?(byId(p.parent)?.name||'Not assigned'):'Not assigned']].map(x=>`<div><label>${x[0]}</label><div class="field">${esc(x[1])}</div></div>`).join('')}</div>${p.status==='Inactive'?`<div class="notice">Inactive member is read-only.${role==='Admin'?' Reactivate before editing.':''}</div>`:''}<div class="actions">${canEdit(p)?`<button class="btn secondary sm" onclick="modal='edit';render()">Edit</button>${(role==='Admin'||role==='Manager')&&p.role!=='Manager'?`<button class="btn secondary sm" onclick="modal='transfer';render()">Transfer</button>`:''}<button class="btn danger sm" onclick="setInactive(${p.id})">Set Inactive</button>`:''}${role==='Admin'&&p.status==='Inactive'?`<button class="btn secondary sm" onclick="reactivate(${p.id})">Reactivate</button><button class="btn danger sm" onclick="modal='delete';render()">Delete</button>`:''}</div>`}function form(p){let isAdd=!p,roles=role==='Admin'?['Manager','Leader','Member']:role==='Manager'?['Leader','Member']:['Member'];return `<form id="member-edit-form" onsubmit="saveMember(event)"><div class="formgrid member-editor-grid"><div class="member-editor-fullname"><label>Full Name *</label><input name="name" required value="${esc(p?.name||'')}"></div>${(canViewICNumber('Team Management')||(isAdd&&salesRestricted()&&canAction('Team Management','Add')))?`<div class="member-editor-ic"><label>IC No. *</label><input name="ic" required value="${esc(p?.ic||'')}"></div>`:''}<div><label>Branch *</label><div id="member-branch-control">${branchInputFor(p?.role||roles[0],p)}</div></div><div><label>Role *</label><select name="role" onchange="switchBranchInputs(this)">${option(p?[...new Set([p.role,...roles])]:roles,p?.role||roles[0])}</select></div>${(role==='Admin'||isAdd||(p&&canEdit(p)))?`<div id="member-reporting-picker" class="reporting-picker member-editor-reporting" style="${(p?.role||roles[0])==='Manager'?'display:none':''}"><label for="reporting-search">Reporting To</label><input type="hidden" name="parent" value="${p?.parent??''}"><input id="reporting-search" class="reporting-input" type="text" autocomplete="off" placeholder="Search name..." value="${esc(byId(p?.parent)?.name||'')}" onfocus="openReportingPicker()" oninput="onReportingInput()"><span class="reporting-chevron">⌄</span><div id="reporting-results" class="reporting-results" hidden></div></div>`:''}</div><div class="notice">${isAdd?'':'Role can be updated here subject to reporting and permission rules.'}</div><div class="actions"><button type="submit" class="btn">Save Member</button><button type="button" class="btn ghost" onclick="modal==='edit'?backToDetails():closeModal()">${modal==='edit'?'← Back to Details':'Cancel'}</button></div><div class="member-save-error" id="member-save-error" role="alert"></div></form>`}function saveMember(e){
+function backToDetails(){modal='details';memberModalError='';render()}function openDetails(id){selected=id;modal='details';memberModalError='';render()}function openAdd(){if(!canAction('Team Management','Add'))return notify('Access denied.');reportingDirectory=null;selected=null;modal='add';render();refreshReportingOptions()}function openEdit(id){selected=id;modal='edit';render()}function closeModal(){modal='';render()}function modalHTML(){let p=byId(selected),title={details:'Member Details',add:'Add Member',edit:'Edit Member',transfer:'Transfer Team',rolechange:'Change Role',delete:'Delete Member',inactiveConfirm:'Confirm Inactive',inactiveTransfers:'Transfer Direct Reports',account:'Create Login Account',resetpass:'Reset Password',branchEdit:'Edit Branch'}[modal]||modal;return `<div class="overlay" onclick="if(event.target===this && !['add','edit','ultranetEdit'].includes(modal))closeModal()"><div class="modal ${['account','permissions'].includes(modal)?'wide-modal':''} ${['add','edit'].includes(modal)?'member-editor-modal':''}"><div class="toolbar" style="justify-content:space-between"><div class="toolbar">${['edit','transfer'].includes(modal)?`<button class="btn ghost sm" onclick="backToDetails()">← Back</button>`:''}<h2>${title}</h2></div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>${modal==='inactiveTransfers'?inactiveTransferForm(p):modal==='resetpass'?passwordResetForm():modal==='branchEdit'?branchEditor():modal==='details'?details(p):modal==='add'||modal==='edit'?form(p):modal==='transfer'?transferForm(p):modal==='rolechange'?roleForm(p):modal==='delete'?deleteForm(p):modal==='inactiveConfirm'?`<p>Set <b>${esc(p.name)}</b> to Inactive?</p><div class="notice">This will disable their Login Account. The member record and history are retained.</div><div class="actions"><button class="btn danger" onclick="confirmInactive(${p.id})">Confirm Inactive</button><button class="btn ghost" onclick="backToDetails()">← Back to Details</button></div>`:modal==='account'?accountForm(p):''}</div></div>`}function details(p){return `${memberModalError?`<div class="notice error-notice">${esc(memberModalError)}<div class="actions" style="margin-top:10px">${children(p.id).map(c=>`<button class="btn ghost sm" onclick="openDetails(${c.id})">View ${esc(c.name)} →</button>`).join('')}</div></div>`:''}<div class="muted">Member #${p.id} &nbsp; <span class="pill ${p.status==='Inactive'?'off':''}">${p.status}</span></div><div class="formgrid">${[['Full Name',p.name],...(canViewICNumber('Team Management')?[['IC No.',ic(p)]]:[]),['Branch',memberBranchText(p)],['Role',p.role],['Reporting To',p.parent!=null?(byId(p.parent)?.name||'Not assigned'):'Not assigned']].map(x=>`<div><label>${x[0]}</label><div class="field">${esc(x[1])}</div></div>`).join('')}</div>${p.status==='Inactive'?`<div class="notice">Inactive member is read-only.${role==='Admin'?' Reactivate before editing.':''}</div>`:''}<div class="actions">${canEdit(p)?`<button class="btn secondary sm" onclick="modal='edit';render()">Edit</button>${(role==='Admin'||role==='Manager')&&p.role!=='Manager'?`<button class="btn secondary sm" onclick="modal='transfer';render()">Transfer</button>`:''}<button class="btn danger sm" onclick="setInactive(${p.id})">Set Inactive</button>`:''}${role==='Admin'&&p.status==='Inactive'?`<button class="btn secondary sm" onclick="reactivate(${p.id})">Reactivate</button><button class="btn danger sm" onclick="modal='delete';render()">Delete</button>`:''}</div>`}function form(p){let isAdd=!p,roles=role==='Admin'?['Manager','Leader','Member']:role==='Manager'?['Leader','Member']:['Member'];return `<form id="member-edit-form" onsubmit="saveMember(event)"><div class="formgrid member-editor-grid"><div class="member-editor-fullname"><label>Full Name *</label><input name="name" required value="${esc(p?.name||'')}"></div>${(canViewICNumber('Team Management')||(isAdd&&salesRestricted()&&canAction('Team Management','Add')))?`<div class="member-editor-ic"><label>IC No. *</label><input name="ic" required value="${esc(p?.ic||'')}"></div>`:''}<div><label>Branch *</label><div id="member-branch-control">${branchInputFor(p?.role||(salesRestricted()?'Member':roles[0]),p)}</div></div><div><label>Role *</label><select name="role" onchange="switchBranchInputs(this)">${option(p?[...new Set([p.role,...roles])]:roles,p?.role||(salesRestricted()?'Member':roles[0]))}</select></div>${(role==='Admin'||isAdd||(p&&canEdit(p)))?`<div id="member-reporting-picker" class="reporting-picker member-editor-reporting" style="${(p?.role||roles[0])==='Manager'?'display:none':''}"><label for="reporting-search">Reporting To</label><input type="hidden" name="parent" value="${p?.parent??''}"><input id="reporting-search" class="reporting-input" type="text" autocomplete="off" placeholder="Search name..." value="${esc(byId(p?.parent)?.name||'')}" onfocus="openReportingPicker()" oninput="onReportingInput()"><span class="reporting-chevron">⌄</span><div id="reporting-results" class="reporting-results" hidden></div></div>`:''}</div><div class="notice">${isAdd?'':'Role can be updated here subject to reporting and permission rules.'}</div><div class="actions"><button type="submit" class="btn">Save Member</button><button type="button" class="btn ghost" onclick="modal==='edit'?backToDetails():closeModal()">${modal==='edit'?'← Back to Details':'Cancel'}</button></div><div class="member-save-error" id="member-save-error" role="alert"></div></form>`}function saveMember(e){
  e?.preventDefault?.();
  const f=document.getElementById('member-edit-form');
  if(!f)return memberFormError('Edit form is unavailable. Please reopen it.');
